@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $packageJson = Get-Content "package.json" | ConvertFrom-Json
 $CurrentVersion = $packageJson.version
 
-if ($null -ne $Version) {
+if (-not [string]::IsNullOrWhiteSpace($Version)) {
     $TargetVersion = $Version
     Write-Host "🏷️ Using explicit version: $TargetVersion" -ForegroundColor Gray
 }
