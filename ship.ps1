@@ -68,11 +68,31 @@ if (-not $NoRelease) {
         Write-Host "⬆️ Pushing tag to origin..."
         git push origin "v$Version" -f
         
-        $Notes = Get-Content "CHANGELOG.md" -Raw
-        # We don't strictly need 'gh release create' here if the Action handles it, 
-        # but it helps to create the draft immediately with notes.
-        gh release create "v$Version" --title "v$Version - The Uprising" --notes "$Notes" --repo "Endsi3g/The-Uprising--Screenrecorder-" --draft
+        Write-Host "📝 Extracting release notes for v$Version..."
+        $changelog = Get-Content "CHANGELOG.md"
+        $inVersion = $false
+        $extractedNotes = @()
+        foreach ($line in $changelog) {
+            if ($line -match "^## \[$Version\]") {
+                $inVersion = $true
+                continue
+            }
+            elseif ($line -match "^## \[") {
+                if ($inVersion) { break }
+            }
+            if ($inVersion) {
+                $extractedNotes += $line
+            }
+        }
+        $Notes = $extractedNotes -join "`n"
+        $NotesPath = "release_notes_$Version.txt"
+        $Notes | Out-File -FilePath $NotesPath -Encoding utf8
+        
+        gh release create "v$Version" --title "v$Version - The Uprising" --notes-file "$NotesPath" --repo "Endsi3g/The-Uprising--Screenrecorder-"
         Write-Host "✅ Release created on GitHub! Build process started in Actions." -ForegroundColor Green
+        
+        # Cleanup
+        Remove-Item -Path $NotesPath -ErrorAction SilentlyContinue
     }
 }
 

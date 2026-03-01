@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   Plus, 
   Folder, 
@@ -9,7 +10,9 @@ import {
   Video,
   Trash2,
   Monitor,
-  Smartphone
+  Smartphone,
+  Youtube,
+  Instagram
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,16 +69,6 @@ export default function ProjectDashboard({ onSelectProject, onNewProject }: {
       (window.electronAPI as any).getMobileConnectionInfo().then(setMobileInfo);
     }
   }, []);
-
-  const saveProjects = (newProjects: Project[]) => {
-    setProjects(newProjects);
-    localStorage.setItem('the-screenrecorder-projects', JSON.stringify(newProjects));
-  };
-
-  const saveIdeas = (newIdeas: Idea[]) => {
-    setIdeas(newIdeas);
-    localStorage.setItem('the-screenrecorder-ideas', JSON.stringify(newIdeas));
-  };
 
   const handleDownload = async () => {
     if (!downloadUrl) return;

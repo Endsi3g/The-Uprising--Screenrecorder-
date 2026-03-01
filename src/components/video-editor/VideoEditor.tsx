@@ -17,6 +17,7 @@ import { ProjectMenu } from "./ProjectMenu";
 import { useCommandHistory } from "@/hooks/useCommandHistory";
 import { getPerformanceMode } from "@/utils/systemCapabilities";
 import { ChangelogDialog } from "../changelog/ChangelogDialog";
+import { v4 as uuidv4 } from "uuid";
 
 import type { Span } from "dnd-timeline";
 import {
@@ -35,6 +36,7 @@ import {
   type AnnotationRegion,
   type CropRegion,
   type FigureData,
+  type CaptionRegion,
 } from "./types";
 import { type ExportResult, type ExportProgress, type ExportQuality, type ExportSettings, type ExportFormat, type GifFrameRate, type GifSizePreset, GIF_SIZE_PRESETS, calculateOutputDimensions } from "@/lib/exporter";
 import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
@@ -219,10 +221,10 @@ export default function VideoEditor({ initialVideoPath, onBackToDashboard }: {
 
 
   // Use a ref to keep track of current state without triggering useCallback updates
-  const stateRef = useRef({ zoomRegions, trimRegions, annotationRegions, selectedZoomId, selectedTrimId, selectedAnnotationId });
+  const stateRef = useRef({ zoomRegions, trimRegions, annotationRegions, captionRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId });
   useEffect(() => {
-    stateRef.current = { zoomRegions, trimRegions, annotationRegions, selectedZoomId, selectedTrimId, selectedAnnotationId };
-  }, [zoomRegions, trimRegions, annotationRegions, selectedZoomId, selectedTrimId, selectedAnnotationId]);
+    stateRef.current = { zoomRegions, trimRegions, annotationRegions, captionRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId };
+  }, [zoomRegions, trimRegions, annotationRegions, captionRegions, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId]);
 
   // Add global keyboard shortcut for Undo/Redo
   useEffect(() => {
@@ -743,6 +745,47 @@ export default function VideoEditor({ initialVideoPath, onBackToDashboard }: {
       undo: () => setAnnotationRegions(prev)
     });
   }, [executeCommand]);
+
+  const handleCaptionAdded = useCallback((span: Span) => {
+    const prev = stateRef.current.captionRegions;
+    const newCaption: CaptionRegion = {
+      id: "caption-" + uuidv4(),
+      startMs: span.start,
+      endMs: span.end,
+      text: "New Caption",
+      style: { ...DEFAULT_ANNOTATION_STYLE, backgroundColor: 'rgba(0,0,0,0.5)' }
+    };
+    const next = [...prev, newCaption];
+
+    executeCommand({
+      execute: () => setCaptionRegions(next),
+      undo: () => setCaptionRegions(prev)
+    });
+  }, [executeCommand]);
+
+  const handleCaptionSpanChange = useCallback((id: string, span: Span) => {
+    const prev = stateRef.current.captionRegions;
+    const next = prev.map((region) =>
+      region.id === id
+        ? { ...region, startMs: span.start, endMs: span.end }
+        : region,
+    );
+
+    executeCommand({
+      execute: () => setCaptionRegions(next),
+      undo: () => setCaptionRegions(prev)
+    });
+  }, [executeCommand]);
+
+  const handleCaptionDelete = useCallback((id: string) => {
+    const prev = stateRef.current.captionRegions;
+    const next = prev.filter((region) => region.id !== id);
+
+    executeCommand({
+      execute: () => setCaptionRegions(next),
+      undo: () => setCaptionRegions(prev)
+    });
+  }, [executeCommand]);
   
   // Global Tab prevention
   useEffect(() => {
@@ -929,7 +972,9 @@ export default function VideoEditor({ initialVideoPath, onBackToDashboard }: {
           videoPadding: padding,
           cropRegion,
           annotationRegions,
+          captionRegions,
           cursorTelemetry,
+          playbackRate,
           previewWidth,
           previewHeight,
         };
@@ -1283,6 +1328,12 @@ export default function VideoEditor({ initialVideoPath, onBackToDashboard }: {
               onAnnotationDelete={handleAnnotationDelete}
               selectedAnnotationId={selectedAnnotationId}
               onSelectAnnotation={handleSelectAnnotation}
+              captionRegions={captionRegions}
+              onCaptionAdded={handleCaptionAdded}
+              onCaptionSpanChange={handleCaptionSpanChange}
+              onCaptionDelete={handleCaptionDelete}
+              selectedCaptionId={selectedCaptionId}
+              onSelectCaption={setSelectedCaptionId}
               aspectRatio={aspectRatio}
               onAspectRatioChange={setAspectRatio}
             />

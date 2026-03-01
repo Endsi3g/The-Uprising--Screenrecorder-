@@ -13,7 +13,7 @@ interface ItemProps {
   isSelected?: boolean;
   onSelect?: () => void;
   zoomDepth?: number;
-  variant?: 'zoom' | 'trim' | 'annotation';
+  variant?: 'zoom' | 'trim' | 'annotation' | 'caption';
 }
 
 // Map zoom depth to multiplier labels
@@ -54,18 +54,21 @@ export default function Item({
 
   const isZoom = variant === 'zoom';
   const isTrim = variant === 'trim';
+  const isCaption = variant === 'caption';
 
   const glassClass = isZoom
     ? glassStyles.glassGreen
     : isTrim
     ? glassStyles.glassRed
+    : isCaption
+    ? glassStyles.glassYellow // Reuse yellow for captions too
     : glassStyles.glassYellow;
 
   const endCapColor = isZoom
     ? '#21916A'
     : isTrim
     ? '#ef4444'
-    : '#B4A046';
+    : '#B4A046'; // Golden/Yellow
 
   const timeLabel = useMemo(
     () => `${formatMs(span.start)} – ${formatMs(span.end)}`,
@@ -119,6 +122,13 @@ export default function Item({
                   <Scissors className="w-3.5 h-3.5 shrink-0" />
                   <span className="text-[11px] font-semibold tracking-tight whitespace-nowrap">
                     Trim
+                  </span>
+                </>
+              ) : isCaption ? (
+                <>
+                  <MessageSquare className="w-3.5 h-3.5 shrink-0 text-yellow-400" />
+                  <span className="text-[11px] font-semibold tracking-tight whitespace-nowrap">
+                    {children}
                   </span>
                 </>
               ) : (

@@ -11,6 +11,8 @@ Now that Phase 5 is delivered, here are the recommended next steps to take the a
 1. **AI Video Highlights**: Automatically detect "action" moments in recordings using system audio analysis.
 2. **Cloud Sync**: Sync video ideas and research from the mobile dashboard to the desktop app via a dedicated backend.
 3. **Plugin System**: Allow developers to create custom video filters and annotations.
+4. **Auto-Translations**: Expand the single-language French caption optimizations to support multi-language auto-detect.
+5. **Direct Integrations**: Automated deployment of videos to YouTube, X, and TikTok directly from the app.
 
 ## 📱 Mobile Connectivity
 - **Mobile App**: Transition the tiny Express dashboard into a full React Native app for better capture of video ideas on the go.

@@ -8,6 +8,7 @@ import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
+import type { Range as DndRange, Span } from "dnd-timeline";
 import type { ZoomRegion, TrimRegion, AnnotationRegion, CursorTelemetryPoint, ZoomFocus, CaptionRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -132,7 +133,7 @@ function calculateTimelineScale(durationSeconds: number): TimelineScaleConfig {
   };
 }
 
-function createInitialRange(totalMs: number): Range {
+function createInitialRange(totalMs: number): DndRange {
   if (totalMs > 0) {
     return { start: 0, end: totalMs };
   }
@@ -604,7 +605,7 @@ export default function TimelineEditor({
     [timelineScale.minItemDurationMs, totalMs],
   );
 
-  const [range, setRange] = useState<Range>(() => createInitialRange(totalMs));
+  const [range, setRange] = useState<DndRange>(() => createInitialRange(totalMs));
   const [keyframes, setKeyframes] = useState<{ id: string; time: number }[]>([]);
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
   const [shortcuts, setShortcuts] = useState({
@@ -990,7 +991,7 @@ export default function TimelineEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [addKeyframe, handleAddZoom, handleAddTrim, handleAddAnnotation, handleAddCaption, deleteSelectedKeyframe, deleteSelectedZoom, deleteSelectedTrim, deleteSelectedAnnotation, deleteSelectedCaption, selectedKeyframeId, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId, annotationRegions, currentTime, onSelectAnnotation]);
 
-  const clampedRange = useMemo<Range>(() => {
+  const clampedRange = useMemo<DndRange>(() => {
     if (totalMs === 0) {
       return range;
     }
@@ -1067,8 +1068,10 @@ export default function TimelineEditor({
       onTrimSpanChange?.(id, span);
     } else if (annotationRegions.some(r => r.id === id)) {
       onAnnotationSpanChange?.(id, span);
+    } else if (captionRegions.some(r => r.id === id)) {
+      onCaptionSpanChange?.(id, span);
     }
-  }, [zoomRegions, trimRegions, annotationRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange]);
+  }, [zoomRegions, trimRegions, annotationRegions, captionRegions, onZoomSpanChange, onTrimSpanChange, onAnnotationSpanChange, onCaptionSpanChange]);
 
   if (!videoDuration || videoDuration === 0) {
     return (
@@ -1204,23 +1207,7 @@ export default function TimelineEditor({
             keyframes={keyframes}
 
           />
-          <Row
-          id={CAPTION_ROW_ID}
-          label="Captions"
-          items={renderItems.filter((i) => i.rowId === CAPTION_ROW_ID)}
-          renderItem={(item) => (
-            <Item
-              key={item.id}
-              item={item}
-              isSelected={selectedCaptionId === item.id}
-              onClick={() => onSelectCaption?.(item.id)}
-              onDelete={() => onCaptionDelete?.(item.id)}
-              color="#F59E0B"
-              label={item.label}
-            />
-          )}
-        />
-      </TimelineWrapper>
+        </TimelineWrapper>
       </div>
     </div>
   );

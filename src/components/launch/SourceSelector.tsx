@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
-import { MdCheck } from "react-icons/md";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Card } from "../ui/card";
 import { MdVideocam, MdVideocamOff } from "react-icons/md";
 import styles from "./SourceSelector.module.css";
 
@@ -69,9 +67,14 @@ export function SourceSelector() {
     fetchCameras();
   }, []);
 
+
+
+
   const screenSources = sources.filter(s => s.id.startsWith('screen:'));
+  const windowSources = sources.filter(s => s.id.startsWith('window:'));
 
   const handleSourceSelect = (source: DesktopSource) => setSelectedSource(source);
+
   const handleShare = async () => {
     if (selectedSource) {
       await window.electronAPI.setSelectedCamera(selectedCamera);
@@ -107,10 +110,67 @@ export function SourceSelector() {
           </TabsList>
             <div className="h-72 flex flex-col justify-stretch">
             <TabsContent value="screens" className="h-full">
-... [lines 80-106] ...
+              <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-72 pr-2 custom-scrollbar">
+                {screenSources.length === 0 ? (
+                  <div className="col-span-2 text-center py-8 text-zinc-500 text-xs">No screens available</div>
+                ) : (
+                  screenSources.map((source) => (
+                    <div
+                      key={source.id}
+                      onClick={() => handleSourceSelect(source)}
+                      className={`relative flex flex-col items-center gap-2 p-2 rounded-lg cursor-pointer border transition-all ${
+                        selectedSource?.id === source.id
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800'
+                      }`}
+                    >
+                      {source.thumbnail ? (
+                        <img src={source.thumbnail} alt={source.name} className="w-full aspect-video object-cover rounded bg-black" />
+                      ) : (
+                        <div className="w-full aspect-video bg-zinc-800 rounded flex items-center justify-center">
+                          <MdVideocam className="w-8 h-8 text-zinc-600" />
+                        </div>
+                      )}
+                      <span className="text-[10px] text-zinc-300 font-medium truncate w-full text-center">{source.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </TabsContent>
             <TabsContent value="windows" className="h-full">
-... [lines 110-146] ...
+              <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-72 pr-2 custom-scrollbar">
+                {windowSources.length === 0 ? (
+                  <div className="col-span-2 text-center py-8 text-zinc-500 text-xs">No windows available</div>
+                ) : (
+                  windowSources.map((source) => (
+                    <div
+                      key={source.id}
+                      onClick={() => handleSourceSelect(source)}
+                      className={`relative flex flex-col items-center gap-2 p-2 rounded-lg cursor-pointer border transition-all ${
+                        selectedSource?.id === source.id
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <div className="relative w-full aspect-video flex-shrink-0 bg-black rounded overflow-hidden">
+                        {source.thumbnail ? (
+                          <img src={source.thumbnail} alt={source.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <MdVideocam className="w-8 h-8 text-zinc-600" />
+                          </div>
+                        )}
+                        {source.appIcon && (
+                          <div className="absolute bottom-1 right-1 w-6 h-6 bg-zinc-900 rounded-md p-1 shadow-lg border border-zinc-700">
+                            <img src={source.appIcon} alt="" className="w-full h-full object-contain" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-zinc-300 font-medium truncate w-full text-center">{source.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </TabsContent>
             <TabsContent value="camera" className="h-full">
               <div className="flex flex-col gap-4 p-4">
