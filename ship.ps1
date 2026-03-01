@@ -1,12 +1,35 @@
-# ship.ps1 - The Uprising Screenrecorder Deployment Engine
 param(
-    [string]$Version = "1.2.0",
+    [string]$Version,
+    [ValidateSet("patch", "minor", "major")]
+    [string]$Bump = "patch",
     [switch]$BuildOnly,
     [switch]$SkipBuild,
     [switch]$NoRelease
 )
 
 $ErrorActionPreference = "Stop"
+
+# 0. Version Management
+$packageJson = Get-Content "package.json" | ConvertFrom-Json
+$CurrentVersion = $packageJson.version
+
+if ($null -ne $Version) {
+    $TargetVersion = $Version
+    Write-Host "🏷️ Using explicit version: $TargetVersion" -ForegroundColor Gray
+}
+elseif ($Bump) {
+    Write-Host "🔄 Bumping version ($Bump) from $CurrentVersion..." -ForegroundColor Yellow
+    npm version $Bump --no-git-tag-version
+    $packageJson = Get-Content "package.json" | ConvertFrom-Json
+    $TargetVersion = $packageJson.version
+    Write-Host "✅ New version: $TargetVersion" -ForegroundColor Green
+}
+else {
+    $TargetVersion = $CurrentVersion
+    Write-Host "🏷️ Using current version: $TargetVersion" -ForegroundColor Gray
+}
+
+$Version = $TargetVersion # Re-assign for script usage
 $RemoteURL = "https://github.com/Endsi3g/The-Uprising--Screenrecorder-.git"
 
 Write-Host "`n🚀 Initializing shipment for The Uprising Screenrecorder v$Version..." -ForegroundColor Cyan
@@ -47,7 +70,7 @@ if ($BuildOnly) {
 # 3. Git Push
 Write-Host "`n📂 Staging and Committing changes..." -ForegroundColor Yellow
 git add .
-git commit -m "release: v$Version - Final Transformation to The Uprising Screenrecorder"
+git commit -m "release: v$Version"
 
 Write-Host "⬆️ Pushing to GitHub (origin/main)..." -ForegroundColor Yellow
 $currentBranch = git branch --show-current

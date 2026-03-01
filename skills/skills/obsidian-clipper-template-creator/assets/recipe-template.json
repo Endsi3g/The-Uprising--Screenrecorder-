@@ -40,9 +40,7 @@
 			"type": "text"
 		}
 	],
-	"triggers": [
-		"schema:Recipe"
-	],
+	"triggers": ["schema:Recipe"],
 	"noteNameFormat": "{{schema:Recipe:name}}",
 	"path": "Recipes/"
 }

@@ -3,14 +3,14 @@ $ErrorActionPreference = "Continue"
 
 Write-Host "🧪 Initializing Verification Suite..." -ForegroundColor Cyan
 
-# 1. Linting
-Write-Host "`n🔍 Checking code quality (Biome)..." -ForegroundColor Yellow
-npm run lint
+# 1. Linting (Auto-fixing where possible)
+Write-Host "`n🔍 Checking and fixing code quality (Biome)..." -ForegroundColor Yellow
+npm run lint:fix
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Linting failed!" -ForegroundColor Red
+    Write-Host "⚠️ Linting found issues that couldn't be auto-fixed." -ForegroundColor Yellow
 }
 else {
-    Write-Host "✅ Linting passed!" -ForegroundColor Green
+    Write-Host "✅ Linting passed (or was successfully fixed)!" -ForegroundColor Green
 }
 
 # 2. Unit Tests
