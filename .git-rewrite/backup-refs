@@ -1,0 +1,17 @@
+cc1bd8d1ed6b41485dd7b8a3255f8964200b5d64 commit	refs/heads/main
+71bb09c82e46a58d64b692e866f4cffd39aa161b commit	refs/remotes/origin/HEAD
+0c89e3e01a1fbd33b008c7261ebcbdab89cedab3 commit	refs/remotes/origin/aspect-ratio
+6a8b99c7bda07b39155a069c04b5add7f9061cbe commit	refs/remotes/origin/feature/trim
+71bb09c82e46a58d64b692e866f4cffd39aa161b commit	refs/remotes/origin/main
+d5ff37a0515ab8ebcde316966d93e40a87a7245f commit	refs/remotes/origin/master
+1306c6e4ea70bac61eee2deffb52efa247b76af7 commit	refs/remotes/origin/v0.1.1
+3a4ec9c470594407447c30a8b83f033765bb5912 commit	refs/tags/1.0.0
+dda08172d956913b8b5aaad3f3567180b27b5f9f commit	refs/tags/v0.0.0
+4a78bb999be1f3eaf9dceb72763df709fe82018b commit	refs/tags/v0.1.0
+9c6ac891e443ed4e131b63a474bc86385147b269 commit	refs/tags/v0.1.1
+d85e6e1254f45fafc2916e1131c582dd4491dfd6 commit	refs/tags/v0.2.0
+d6d1a3eca606ee4c870a55024569ccdc799985db commit	refs/tags/v1.0.1
+7e0ce53df04fbb11b0bb1a4c7a6eb65213adf5f1 commit	refs/tags/v1.0.2
+6d2e1edb5b60f80eb528c8366566c09b202f8e6c commit	refs/tags/v1.1.0
+d5dbcb3a7a8e73da87a2884d7ac871d385e33031 commit	refs/tags/v1.1.2
+76337516446ba2f5df6da55ecc017c6a3273e2db commit	refs/tags/v1.2.0
