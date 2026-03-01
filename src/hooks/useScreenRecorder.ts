@@ -26,7 +26,6 @@ const DEFAULT_HEIGHT = 1080;
 const CODEC_ALIGNMENT = 2;
 
 const RECORDER_TIMESLICE_MS = 1000;
-const BITS_PER_MEGABIT = 1_000_000;
 const CHROME_MEDIA_SOURCE = "desktop";
 const RECORDING_FILE_PREFIX = "recording-";
 const VIDEO_FILE_EXTENSION = ".webm";

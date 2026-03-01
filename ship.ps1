@@ -17,12 +17,14 @@ try {
     if ($null -eq $currentOrigin) {
         Write-Host "🔗 Setting up origin..."
         git remote add origin $RemoteURL
-    } elseif ($currentOrigin -notlike "*Endsi3g*") {
+    }
+    elseif ($currentOrigin -notlike "*Endsi3g*") {
         Write-Host "🔗 Renaming existing origin to 'upstream' and setting new origin..."
         git remote rename origin upstream
         git remote add origin $RemoteURL
     }
-} catch {
+}
+catch {
     Write-Host "⚠️ Git remote setup encountered a minor snag, continuing..." -ForegroundColor Gray
 }
 
@@ -56,10 +58,21 @@ if (-not $NoRelease) {
     Write-Host "`n🏷️ Generating GitHub Release..." -ForegroundColor Yellow
     if ($null -eq (Get-Command gh -ErrorAction SilentlyContinue)) {
         Write-Host "⚠️ GitHub CLI (gh) not found. Skipping release creation." -ForegroundColor Red
-    } else {
+    }
+    else {
+        # Create Git Tag locally
+        Write-Host "🏷️ Creating Git Tag: v$Version..."
+        git tag -a "v$Version" -m "Release v$Version" -f
+        
+        # Push Tag to GitHub
+        Write-Host "⬆️ Pushing tag to origin..."
+        git push origin "v$Version" -f
+        
         $Notes = Get-Content "CHANGELOG.md" -Raw
-        gh release create "v$Version" --title "v$Version - The Uprising" --notes "$Notes" --repo "Endsi3g/The-Uprising--Screenrecorder-"
-        Write-Host "✅ Release created on GitHub!" -ForegroundColor Green
+        # We don't strictly need 'gh release create' here if the Action handles it, 
+        # but it helps to create the draft immediately with notes.
+        gh release create "v$Version" --title "v$Version - The Uprising" --notes "$Notes" --repo "Endsi3g/The-Uprising--Screenrecorder-" --draft
+        Write-Host "✅ Release created on GitHub! Build process started in Actions." -ForegroundColor Green
     }
 }
 

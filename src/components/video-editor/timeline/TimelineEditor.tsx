@@ -8,8 +8,7 @@ import TimelineWrapper from "./TimelineWrapper";
 import Row from "./Row";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
-import type { Range, Span } from "dnd-timeline";
-import type { ZoomRegion, TrimRegion, AnnotationRegion, CursorTelemetryPoint, ZoomFocus } from "../types";
+import type { ZoomRegion, TrimRegion, AnnotationRegion, CursorTelemetryPoint, ZoomFocus, CaptionRegion } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 import {
   DropdownMenu,

@@ -70,7 +70,6 @@ export function SourceSelector() {
   }, []);
 
   const screenSources = sources.filter(s => s.id.startsWith('screen:'));
-  const windowSources = sources.filter(s => s.id.startsWith('window:'));
 
   const handleSourceSelect = (source: DesktopSource) => setSelectedSource(source);
   const handleShare = async () => {

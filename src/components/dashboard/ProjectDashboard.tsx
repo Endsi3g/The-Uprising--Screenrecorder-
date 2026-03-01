@@ -1,30 +1,28 @@
-import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Folder, 
   Lightbulb, 
   Download, 
-  FileText, 
   Search, 
   MoreVertical, 
   Clock, 
   Video,
-  ExternalLink,
-  Instagram,
-  Youtube,
   Trash2,
-  Save,
-  ChevronRight,
   Monitor,
   Smartphone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ChangelogDialog } from '../changelog/ChangelogDialog';
+
+// Simplified inline Badge component to avoid missing module error
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${className}`}>
+    {children}
+  </span>
+);
 
 interface Project {
   id: string;
@@ -64,8 +62,8 @@ export default function ProjectDashboard({ onSelectProject, onNewProject }: {
     if (savedIdeas) setIdeas(JSON.parse(savedIdeas));
 
     // Fetch mobile connection info
-    if (window.electronAPI?.getMobileConnectionInfo) {
-      window.electronAPI.getMobileConnectionInfo().then(setMobileInfo);
+    if ((window.electronAPI as any)?.getMobileConnectionInfo) {
+      (window.electronAPI as any).getMobileConnectionInfo().then(setMobileInfo);
     }
   }, []);
 
@@ -377,9 +375,9 @@ export default function ProjectDashboard({ onSelectProject, onNewProject }: {
               <div className="flex flex-col items-center gap-2 pt-4">
                 <p className="text-xs text-gray-500 italic">Downloads are powered by yt-dlp - keep it open source.</p>
                 <div className="flex gap-4 opacity-50 grayscale hover:grayscale-0 transition-all cursor-default">
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-gray-700">MP4</Badge>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-gray-700">WEBM</Badge>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-gray-700">MKV</Badge>
+                  <span className="text-[10px] uppercase tracking-tighter border border-gray-700 px-2 py-0.5 rounded">MP4</span>
+                  <span className="text-[10px] uppercase tracking-tighter border border-gray-700 px-2 py-0.5 rounded">WEBM</span>
+                  <span className="text-[10px] uppercase tracking-tighter border border-gray-700 px-2 py-0.5 rounded">MKV</span>
                 </div>
               </div>
             </div>
