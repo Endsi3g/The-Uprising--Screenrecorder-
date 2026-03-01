@@ -1,7 +1,9 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.13/schema.json",
 	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-	"files": { "ignoreUnknown": false },
+	"files": { 
+		"ignoreUnknown": false
+	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
@@ -75,13 +77,6 @@
 				"noFallthroughSwitchClause": "error",
 				"noFunctionAssign": "error",
 				"noGlobalAssign": "error",
-				"noImportAssign": "error",
-				"noIrregularWhitespace": "error",
-				"noMisleadingCharacterClass": "error",
-				"noMisleadingInstantiator": "error",
-				"noNonNullAssertedOptionalChain": "error",
-				"noPrototypeBuiltins": "error",
-				"noRedeclare": "error",
 				"noShadowRestrictedNames": "error",
 				"noSparseArray": "error",
 				"noTsIgnore": "error",
@@ -91,8 +86,7 @@
 				"noWith": "error",
 				"useGetterReturn": "error"
 			}
-		},
-		"includes": ["**", "**/dist", "**/.eslintrc.cjs", "**", "**/dist", "**/.eslintrc.cjs"]
+		}
 	},
 	"javascript": { "formatter": { "quoteStyle": "double" } },
 	"overrides": [

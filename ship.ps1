@@ -88,7 +88,10 @@ if (-not $NoRelease) {
         $NotesPath = "release_notes_$Version.txt"
         $Notes | Out-File -FilePath $NotesPath -Encoding utf8
         
-        gh release create "v$Version" --title "v$Version - The Uprising" --notes-file "$NotesPath" --repo "Endsi3g/The-Uprising--Screenrecorder-"
+        $ExePath = "release\$Version\The Uprising Screenrecorder Setup $Version.exe"
+        Write-Host "📦 Including installer in release: $ExePath"
+        
+        gh release create "v$Version" "$ExePath" --title "v$Version - The Uprising" --notes-file "$NotesPath" --repo "Endsi3g/The-Uprising--Screenrecorder-"
         Write-Host "✅ Release created on GitHub! Build process started in Actions." -ForegroundColor Green
         
         # Cleanup
