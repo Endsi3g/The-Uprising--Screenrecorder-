@@ -81,6 +81,26 @@ export function registerIpcHandlers(
 				const child = spawn("yt-dlp", args);
 				let lastOutput = "";
 				let finalFilePath = "";
+				let finished = false;
+
+				// timeout after 10 minutes
+				const timeoutId = setTimeout(() => {
+					if (!finished) {
+						finished = true;
+						child.kill("SIGKILL");
+						resolve({
+							success: false,
+							message: "Download timed out after 10 minutes",
+							error: `stderr: ${lastOutput}\nURL: ${url}`,
+						});
+					}
+				}, 10 * 60 * 1000);
+
+				const safeSend = (channel: string, data: any) => {
+					if (!sender.isDestroyed()) {
+						sender.send(channel, data);
+					}
+				};
 
 				child.stdout.on("data", (data) => {
 					const output = data.toString();
@@ -90,11 +110,10 @@ export function registerIpcHandlers(
 					const progressMatch = output.match(/download:\s*([\d.]+)%/);
 					if (progressMatch) {
 						const progress = parseFloat(progressMatch[1]);
-						sender.send("download-progress", { progress, url });
+						safeSend("download-progress", { progress, url });
 					}
 
 					// Look for completion message to get the actual filename
-					// yt-dlp often prints "Merging formats into..." or "Destination: ..."
 					const destMatch = output.match(/\[download\] Destination: (.*)/) || 
 									 output.match(/\[ffmpeg\] Merging formats into "(.*)"/);
 					if (destMatch) {
@@ -107,11 +126,15 @@ export function registerIpcHandlers(
 				});
 
 				child.on("close", (code) => {
+					if (finished) return;
+					finished = true;
+					clearTimeout(timeoutId);
+
 					if (code === 0) {
 						resolve({
 							success: true,
 							message: "Download complete",
-							path: finalFilePath || downloadsDir, // Fallback to downloads dir if filename capture failed
+							path: finalFilePath || downloadsDir,
 						});
 					} else {
 						resolve({
@@ -123,6 +146,10 @@ export function registerIpcHandlers(
 				});
 
 				child.on("error", (err) => {
+					if (finished) return;
+					finished = true;
+					clearTimeout(timeoutId);
+
 					resolve({
 						success: false,
 						message: "Failed to start downloader",
@@ -165,8 +192,15 @@ export function registerIpcHandlers(
 	try {
 		const port = 3001;
 		const localIp = getLocalIp();
-		mobileApp.listen(port, "0.0.0.0", () => {
+		const server = mobileApp.listen(port, "0.0.0.0", () => {
 			console.log(`Mobile dashboard access available at http://${localIp}:${port}`);
+		});
+
+		server.on("error", (err: any) => {
+			console.error("Mobile server async error:", err);
+			if (err.code === "EADDRINUSE") {
+				console.error(`Port ${port} is already in use.`);
+			}
 		});
 
 		ipcMain.handle("get-mobile-connection-info", () => {
@@ -177,7 +211,7 @@ export function registerIpcHandlers(
 			};
 		});
 	} catch (err) {
-		console.error("Failed to start mobile dashboard server:", err);
+		console.error("Failed to start mobile dashboard server (sync error):", err);
 	}
 
 	ipcMain.handle("get-sources", async (_, opts) => {
@@ -296,12 +330,15 @@ export function registerIpcHandlers(
 	});
 
 	ipcMain.handle("get-cursor-telemetry", async (_, videoPath?: string) => {
-		const targetVideoPath = videoPath ?? currentVideoPath;
-		if (!targetVideoPath) {
+		const inputPath = videoPath ?? currentVideoPath;
+		if (!inputPath) {
 			return { success: true, samples: [] };
 		}
 
-		const telemetryPath = `${targetVideoPath}.cursor.json`;
+		// Sanitize input to prevent path traversal
+		// Resolve filename only and join with recordings directory
+		const fileName = path.basename(inputPath);
+		const telemetryPath = path.join(RECORDINGS_DIR, `${fileName}.cursor.json`);
 		try {
 			const content = await fs.readFile(telemetryPath, "utf-8");
 			const parsed = JSON.parse(content);
@@ -350,6 +387,13 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("open-external-url", async (_, url: string) => {
 		try {
+			const parsed = new URL(url);
+			const allowedProtocols = ["https:", "http:", "mailto:"];
+			if (!allowedProtocols.includes(parsed.protocol)) {
+				console.error("Security warning: Blocked opening external URL with unsupported protocol:", parsed.protocol);
+				return { success: false, message: "Unsupported protocol" };
+			}
+
 			await shell.openExternal(url);
 			return { success: true };
 		} catch (error) {

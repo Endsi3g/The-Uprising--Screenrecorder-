@@ -4,7 +4,7 @@ All notable changes to **The Uprising Screenrecorder** will be documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.2.1] - 2026-03-02
+## [1.2.2] - 2026-03-02
 
 ### Added
 
@@ -14,16 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Improved Downloader**: Refactored `download-video` to use `spawn` for real-time progress updates and automatic project integration.
+- **Improved Downloader**: Refactored `download-video` to use `spawn` with real-time progress updates, 10-minute timeout, and automatic project integration.
 - **App Title**: Updated window title to "The Uprising Screen Recorder".
-- **Enhanced Types**: Improved ElectronAPI TypeScript definitions for audio devices, ensuring better code reliability.
+- **Enhanced Types**: Improved ElectronAPI TypeScript definitions for audio devices.
 
 ### Fixed
 
-- **Notification Assets**: Fixed broken icon paths in packaged Windows builds for completion alerts.
-- **Rename Logic**: Fixed a bug where cancelling project renaming with Escape would still trigger a rename via blur.
-- **Multimonitor Cursors**: Fixed coordinate normalization for cursor telemetry on multi-monitor setups.
-- **Recording Stability**: Added safeguards against `localStorage` errors and failed video saves preventing editor activation.
+- **Path Traversal Security**: Sanitized `get-cursor-telemetry` inputs to prevent unauthorized file access.
+- **Protocol Allowlist**: Implemented security checks for external URLs (restricting to https, http, mailto).
+- **Download Stability**: Added guards against destroyed window senders and handled mobile server bind errors (`EADDRINUSE`).
+- **Notification Assets**: Fixed broken icon paths in packaged builds for completion alerts.
+- **Rename Logic**: Prevented empty project names and fixed Escape key handling during renaming.
+- **Multi-monitor Cursors**: Fixed coordinate normalization for cursor telemetry on multi-monitor setups.
+- **Recording Stability**: Added safeguards against `localStorage` errors and failed video saves.
 
 ## [1.2.0] - 2026-03-01
 

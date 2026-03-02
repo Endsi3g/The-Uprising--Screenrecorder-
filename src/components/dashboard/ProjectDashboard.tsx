@@ -104,17 +104,20 @@ export default function ProjectDashboard({
 				toast.success("Download complete!");
 				
 				// Create a new project for the downloaded video
-				const fileName = result.path.split(/[\\/]/).pop() || "Downloaded Video";
+				const fileName = downloadUrl.split("/").pop() || "Downloaded Video";
 				const newProject: Project = {
 					id: Date.now().toString(),
-					name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
+					name: fileName,
+					thumbnail: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=300&h=200&auto=format&fit=crop",
 					lastModified: Date.now(),
-					videoPath: result.path
+					videoPath: result.path,
 				};
 
-				const updatedProjects = [newProject, ...projects];
-				setProjects(updatedProjects);
-				localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+				setProjects((prev) => {
+					const updated = [newProject, ...prev];
+					localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updated));
+					return updated;
+				});
 				
 				setDownloadUrl("");
 				setActiveTab("projects"); // Switch to projects tab to see it
@@ -131,10 +134,18 @@ export default function ProjectDashboard({
 	};
 
 	const handleRename = (id: string, newName: string) => {
-		const updatedProjects = projects.map((p) => (p.id === id ? { ...p, name: newName } : p));
-		setProjects(updatedProjects);
-		localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
-		setRenamingProjectId(null);
+		const trimmedName = newName.trim();
+		if (!trimmedName) {
+			toast.error("Project name cannot be empty");
+			return;
+		}
+
+		setProjects((prev) => {
+			const updated = prev.map((p) => (p.id === id ? { ...p, name: trimmedName } : p));
+			localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updated));
+			return updated;
+		});
+		setRenamingProjectId(null); // Keep original state variable name
 		toast.success("Project renamed");
 	};
 
