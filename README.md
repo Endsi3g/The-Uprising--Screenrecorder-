@@ -1,7 +1,7 @@
 # <p align="center">The Uprising Screenrecorder</p>
 
 <p align="center">
-  <img src="public/uprising-logo.png" alt="Uprising Logo" width="128" />
+  <img src="public/uprising-logo.png" alt="The Uprising Logo" width="256" />
 </p>
 
 <p align="center"><strong>A professional-grade, high-performance screen recording and editing suite.</strong></p>

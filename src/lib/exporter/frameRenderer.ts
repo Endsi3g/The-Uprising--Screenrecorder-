@@ -35,6 +35,7 @@ interface FrameRenderConfig {
 	annotationRegions?: AnnotationRegion[];
 	captionRegions?: CaptionRegion[];
 	cursorTelemetry?: CursorTelemetryPoint[];
+	showCursorHighlighter?: boolean;
 	previewWidth?: number;
 	previewHeight?: number;
 }
@@ -383,8 +384,10 @@ export class FrameRenderer {
 		ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
 		timeMs: number,
 	): void {
+		if (!this.config.showCursorHighlighter) return;
+		
 		const samples = this.config.cursorTelemetry!;
-		if (samples.length === 0) return;
+		if (!samples || samples.length === 0) return;
 
 		// Find the closest sample or interpolate
 		// For simplicity and performance, find the closest one
@@ -409,33 +412,36 @@ export class FrameRenderer {
 
 		const { cx, cy } = closestSample;
 		const { width, height } = this.config;
-
-		// Convert normalized coordinates (0-1) to pixel coordinates
-		// Important: Cursor positions are usually relative to the source video size
-		// but the final composite might be scaled.
-		// We assume cx/cy are normalized 0-1 of the logic stage.
-
-		const x = cx * width;
-		const y = cy * height;
+		const state = this.animationState;
+		
+		// Map normalized coordinates through zoom transform
+		const stageCenterX = width / 2;
+		const stageCenterY = height / 2;
+		
+		const x = stageCenterX + (cx - state.focusX) * width * state.scale;
+		const y = stageCenterY + (cy - state.focusY) * height * state.scale;
 
 		ctx.save();
 
-		// Draw a professional cursor (circle with shadow)
-		ctx.shadowBlur = 4;
-		ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-		ctx.shadowOffsetX = 1;
-		ctx.shadowOffsetY = 1;
+		// scale visuals based on export size vs preview
+		const previewWidth = this.config.previewWidth || 1920;
+		const scaleFactor = width / previewWidth;
 
-		// Outer white border
+		// Outer glow
 		ctx.beginPath();
-		ctx.arc(x, y, 6, 0, Math.PI * 2);
-		ctx.fillStyle = "#FFFFFF";
+		ctx.arc(x, y, 20 * scaleFactor, 0, Math.PI * 2);
+		ctx.fillStyle = "rgba(59, 130, 246, 0.4)";
 		ctx.fill();
+		
+		// Border
+		ctx.lineWidth = 2 * scaleFactor;
+		ctx.strokeStyle = "rgba(59, 130, 246, 0.8)";
+		ctx.stroke();
 
-		// Inner blue core (The Screenrecorder branding)
+		// Inner white dot
 		ctx.beginPath();
-		ctx.arc(x, y, 4, 0, Math.PI * 2);
-		ctx.fillStyle = "#3B82F6";
+		ctx.arc(x, y, 4 * scaleFactor, 0, Math.PI * 2);
+		ctx.fillStyle = "white";
 		ctx.fill();
 
 		ctx.restore();

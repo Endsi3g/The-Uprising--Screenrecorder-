@@ -153,7 +153,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 			// 3. Get Microphone Stream
 			let micStream: MediaStream | null = null;
 			try {
-				micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+				const selectedMicId = await (window.electronAPI as any)?.getSelectedMic?.();
+				micStream = await navigator.mediaDevices.getUserMedia({ 
+					audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true 
+				});
 			} catch (micErr) {
 				console.warn("Could not access microphone:", micErr);
 			}
@@ -273,10 +276,28 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 						arrayBuffer,
 						videoFileName,
 					);
+					
 					if (videoResult.success && videoResult.path) {
-						await window.electronAPI.setCurrentVideoPath(videoResult.path);
+						try {
+							// Update localStorage for dashboard sync
+							const savedProjects = localStorage.getItem("the-screenrecorder-projects");
+							const projects = savedProjects ? JSON.parse(savedProjects) : [];
+							const newProject = {
+								id: `proj-${Date.now()}`,
+								name: `Recording ${new Date().toLocaleString()}`,
+								lastModified: Date.now(),
+								videoPath: videoResult.path,
+							};
+							localStorage.setItem("the-screenrecorder-projects", JSON.stringify([newProject, ...projects]));
+						} catch (storageError) {
+							console.error("Error managing localStorage projects:", storageError);
+						} finally {
+							await window.electronAPI.setCurrentVideoPath(videoResult.path);
+							await window.electronAPI.switchToEditor();
+						}
+					} else {
+						console.error("Recording save failed, skipping editor switch");
 					}
-					await window.electronAPI.switchToEditor();
 				} catch (error) {
 					console.error("Error saving recording:", error);
 				}

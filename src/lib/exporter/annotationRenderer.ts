@@ -227,7 +227,7 @@ async function renderImage(
 	width: number,
 	height: number,
 ): Promise<void> {
-	if (!annotation.content || !annotation.content.startsWith("data:image")) {
+	if (!annotation.content) {
 		return;
 	}
 
@@ -254,6 +254,8 @@ async function renderImage(
 		}
 
 		ctx.drawImage(imgBitmap, drawX, drawY, drawWidth, drawHeight);
+		// Clean up bitmap to avoid memory leaks
+		imgBitmap.close();
 	} catch (e) {
 		console.error("[AnnotationRenderer] Failed to load image annotation", e);
 	}

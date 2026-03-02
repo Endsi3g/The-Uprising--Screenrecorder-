@@ -5,7 +5,6 @@ import {
 	Instagram,
 	Lightbulb,
 	Monitor,
-	MoreVertical,
 	Plus,
 	Search,
 	Smartphone,
@@ -13,7 +12,7 @@ import {
 	Video,
 	Youtube,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +64,19 @@ export default function ProjectDashboard({
 	const [mobileInfo, setMobileInfo] = useState<{ ip: string; port: number; url: string } | null>(
 		null,
 	);
+	const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+	const [renameValue, setRenameValue] = useState("");
+	const cancelledRenameRef = useRef(false);
+	const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+
+	useEffect(() => {
+		if ((window.electronAPI as any)?.onDownloadProgress) {
+			const cleanup = (window.electronAPI as any).onDownloadProgress((data: any) => {
+				setDownloadProgress(data.progress);
+			});
+			return cleanup;
+		}
+	}, []);
 
 	useEffect(() => {
 		// Load projects and ideas from localStorage
@@ -83,14 +95,29 @@ export default function ProjectDashboard({
 	const handleDownload = async () => {
 		if (!downloadUrl) return;
 		setIsDownloading(true);
+		setDownloadProgress(0);
 		toast.info("Starting download with yt-dlp...");
 
 		try {
-			const result = await window.electronAPI.downloadVideo(downloadUrl);
+			const result = (await window.electronAPI.downloadVideo(downloadUrl)) as any;
 			if (result.success) {
 				toast.success("Download complete!");
+				
+				// Create a new project for the downloaded video
+				const fileName = result.path.split(/[\\/]/).pop() || "Downloaded Video";
+				const newProject: Project = {
+					id: Date.now().toString(),
+					name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
+					lastModified: Date.now(),
+					videoPath: result.path
+				};
+
+				const updatedProjects = [newProject, ...projects];
+				setProjects(updatedProjects);
+				localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+				
 				setDownloadUrl("");
-				// Logic to refresh ideas/videos could go here
+				setActiveTab("projects"); // Switch to projects tab to see it
 			} else {
 				toast.error(`Download failed: ${result.message}`);
 			}
@@ -99,7 +126,31 @@ export default function ProjectDashboard({
 			toast.error("An unexpected error occurred during download");
 		} finally {
 			setIsDownloading(false);
+			setDownloadProgress(null);
 		}
+	};
+
+	const handleRename = (id: string, newName: string) => {
+		const updatedProjects = projects.map((p) => (p.id === id ? { ...p, name: newName } : p));
+		setProjects(updatedProjects);
+		localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+		setRenamingProjectId(null);
+		toast.success("Project renamed");
+	};
+
+	const handleDelete = (id: string) => {
+		if (window.confirm("Are you sure you want to delete this project?")) {
+			const updatedProjects = projects.filter((p) => p.id !== id);
+			setProjects(updatedProjects);
+			localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+			toast.success("Project deleted");
+		}
+	};
+
+	const startRenaming = (project: Project) => {
+		setRenamingProjectId(project.id);
+		setRenameValue(project.name);
+		cancelledRenameRef.current = false;
 	};
 
 	const filteredProjects = projects.filter((p) =>
@@ -245,10 +296,51 @@ export default function ProjectDashboard({
 											</div>
 											<CardHeader className="p-4 space-y-1">
 												<div className="flex items-center justify-between">
-													<CardTitle className="text-sm font-semibold truncate text-gray-100">
-														{project.name}
-													</CardTitle>
-													<MoreVertical size={14} className="text-gray-500 hover:text-white" />
+													{renamingProjectId === project.id ? (
+														<Input
+															autoFocus
+															value={renameValue}
+															onChange={(e) => setRenameValue(e.target.value)}
+															onBlur={() => {
+																if (!cancelledRenameRef.current) {
+																	handleRename(project.id, renameValue);
+																}
+																cancelledRenameRef.current = false;
+															}}
+															onKeyDown={(e) => {
+																if (e.key === "Enter") handleRename(project.id, renameValue);
+																if (e.key === "Escape") {
+																	cancelledRenameRef.current = true;
+																	setRenamingProjectId(null);
+																}
+															}}
+															className="h-7 text-xs bg-[#1A1A1A] border-[#3B82F6] focus-visible:ring-0 mr-4"
+														/>
+													) : (
+														<CardTitle
+															className="text-sm font-semibold truncate text-gray-100 hover:text-[#3B82F6] transition-colors"
+															onClick={(e) => {
+																e.stopPropagation();
+																startRenaming(project);
+															}}
+															title="Click to rename"
+														>
+															{project.name}
+														</CardTitle>
+													)}
+													<div className="flex items-center gap-1">
+														<Button
+															variant="ghost"
+															size="sm"
+															className="h-7 w-7 p-0 text-gray-500 hover:text-red-500 hover:bg-red-500/10"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleDelete(project.id);
+															}}
+														>
+															<Trash2 size={14} />
+														</Button>
+													</div>
 												</div>
 												<CardDescription className="text-xs text-gray-500 flex items-center gap-1">
 													<Clock size={12} />
@@ -388,7 +480,7 @@ export default function ProjectDashboard({
 												{isDownloading ? (
 													<div className="flex items-center gap-2">
 														<div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-														<span>Downloading...</span>
+														<span>{downloadProgress !== null ? `${Math.round(downloadProgress)}%` : "Downloading..."}</span>
 													</div>
 												) : (
 													"Download"
@@ -396,6 +488,15 @@ export default function ProjectDashboard({
 											</Button>
 										</div>
 									</div>
+
+									{isDownloading && downloadProgress !== null && (
+										<div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+											<div 
+												className="h-full bg-[#3B82F6] transition-all duration-300"
+												style={{ width: `${downloadProgress}%` }}
+											></div>
+										</div>
+									)}
 
 									<div className="grid grid-cols-2 gap-4 mt-4">
 										<div className="p-4 bg-[#1A1A1A] border border-[#262626] rounded-xl flex items-center gap-4 group hover:border-[#3B82F6]/30 transition-colors">

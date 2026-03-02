@@ -1,18 +1,14 @@
-import { exec } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import cors from "cors";
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, screen, shell } from "electron";
+import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Notification, screen, shell } from "electron";
 import express from "express";
 import { RECORDINGS_DIR } from "../main";
 
 const CURSOR_TELEMETRY_VERSION = 1;
 const CURSOR_SAMPLE_INTERVAL_MS = 100; // 10Hz sampling
 const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
-
-const execAsync = promisify(exec);
 
 interface CursorTelemetryPoint {
 	timeMs: number;
@@ -29,6 +25,7 @@ export function registerIpcHandlers(
 	createCameraOverlayWindow?: () => BrowserWindow,
 ) {
 	let selectedSource: Electron.DesktopCapturerSource | null = null;
+	let selectedMicId: string | null = null;
 	let currentVideoPath: string | null = null;
 	let cameraOverlayWin: BrowserWindow | null = null;
 
@@ -40,12 +37,16 @@ export function registerIpcHandlers(
 	const sampleCursorPoint = () => {
 		const { x, y } = screen.getCursorScreenPoint();
 		const display = screen.getDisplayNearestPoint({ x, y });
-		const { width, height } = display.size;
+		const { x: displayX, y: displayY, width, height } = display.bounds;
+
+		// Calculate coordinates relative to the specific display's origin
+		const rx = (x - displayX) / width;
+		const ry = (y - displayY) / height;
 
 		activeCursorSamples.push({
 			timeMs: Date.now() - cursorCaptureStartTimeMs,
-			cx: x / width,
-			cy: y / height,
+			cx: clamp(rx, 0, 1),
+			cy: clamp(ry, 0, 1),
 		});
 	};
 
@@ -56,27 +57,84 @@ export function registerIpcHandlers(
 		}
 	};
 
-	ipcMain.handle("download-video", async (_, url: string) => {
+	ipcMain.handle("download-video", async (event, url: string) => {
+		const sender = event.sender;
+		
 		try {
 			const downloadsDir = app.getPath("downloads");
-			const outputPath = path.join(downloadsDir, "TheScreenrecorder_%(title)s.%(ext)s");
+			// Use a more predictable output filename pattern for yt-dlp
+			const filenameTemplate = "OpenScreen_Download_%(title)s_%(id)s.%(ext)s";
+			const outputPath = path.join(downloadsDir, filenameTemplate);
 
-			// Basic yt-dlp command
-			// In a real scenario, we'd ensure yt-dlp is bundled or in path
-			const command = `yt-dlp -o "${outputPath}" "${url}"`;
+			const { spawn } = await import("node:child_process");
 
-			const { stdout } = await execAsync(command);
+			return new Promise((resolve) => {
+				const args = [
+					"--no-playlist",
+					"--newline",
+					"--progress",
+					"--progress-template", "download:%(progress._percent_str)s",
+					"-o", outputPath,
+					url
+				];
 
-			return {
-				success: true,
-				message: "Download complete",
-				output: stdout,
-			};
+				const child = spawn("yt-dlp", args);
+				let lastOutput = "";
+				let finalFilePath = "";
+
+				child.stdout.on("data", (data) => {
+					const output = data.toString();
+					lastOutput += output;
+
+					// Parse progress: "download: 45.2%"
+					const progressMatch = output.match(/download:\s*([\d.]+)%/);
+					if (progressMatch) {
+						const progress = parseFloat(progressMatch[1]);
+						sender.send("download-progress", { progress, url });
+					}
+
+					// Look for completion message to get the actual filename
+					// yt-dlp often prints "Merging formats into..." or "Destination: ..."
+					const destMatch = output.match(/\[download\] Destination: (.*)/) || 
+									 output.match(/\[ffmpeg\] Merging formats into "(.*)"/);
+					if (destMatch) {
+						finalFilePath = destMatch[1].trim().replace(/^"(.*)"$/, '$1');
+					}
+				});
+
+				child.stderr.on("data", (data) => {
+					console.warn("yt-dlp stderr:", data.toString());
+				});
+
+				child.on("close", (code) => {
+					if (code === 0) {
+						resolve({
+							success: true,
+							message: "Download complete",
+							path: finalFilePath || downloadsDir, // Fallback to downloads dir if filename capture failed
+						});
+					} else {
+						resolve({
+							success: false,
+							message: `Download failed with code ${code}`,
+							error: lastOutput,
+						});
+					}
+				});
+
+				child.on("error", (err) => {
+					resolve({
+						success: false,
+						message: "Failed to start downloader",
+						error: String(err),
+					});
+				});
+			});
 		} catch (error) {
-			console.error("yt-dlp error:", error);
+			console.error("Downloader setup error:", error);
 			return {
 				success: false,
-				message: "Download failed",
+				message: "Downloader setup failed",
 				error: String(error),
 			};
 		}
@@ -508,5 +566,33 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("get-camera-enabled", () => {
 		return isCameraEnabled;
+	});
+
+	// Audio Selection
+	ipcMain.handle("set-selected-mic", (_, deviceId: string | null) => {
+		selectedMicId = deviceId;
+		return { success: true };
+	});
+
+	ipcMain.handle("get-selected-mic", () => {
+		return selectedMicId;
+	});
+
+	// OS Notifications
+	ipcMain.handle("send-notification", (_, { title, body, silent = false }: { title: string; body: string; silent?: boolean }) => {
+		if (Notification.isSupported()) {
+			const iconPath = app.isPackaged 
+				? path.join(process.resourcesPath, "public", "uprising-logo.png")
+				: path.join(app.getAppPath(), "public", "uprising-logo.png");
+				
+			new Notification({
+				title,
+				body,
+				silent,
+				icon: iconPath
+			}).show();
+			return { success: true };
+		}
+		return { success: false, error: "Notifications not supported" };
 	});
 }

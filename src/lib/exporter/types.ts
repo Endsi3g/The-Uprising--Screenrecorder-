@@ -5,6 +5,7 @@ export interface ExportConfig {
 	bitrate: number;
 	codec?: string;
 	playbackRate?: number;
+	showCursorHighlighter?: boolean;
 }
 
 export interface ExportProgress {

@@ -93,4 +93,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getMobileConnectionInfo: () => {
 		return ipcRenderer.invoke("get-mobile-connection-info");
 	},
+	sendNotification: (opts: { title: string; body: string; silent?: boolean }) => {
+		return ipcRenderer.invoke("send-notification", opts);
+	},
+	getSelectedMic: () => {
+		return ipcRenderer.invoke("get-selected-mic");
+	},
+	setSelectedMic: (deviceId: string | null) => {
+		return ipcRenderer.invoke("set-selected-mic", deviceId);
+	},
+	onDownloadProgress: (callback: (data: { progress: number; url: string }) => void) => {
+		const listener = (_: any, data: any) => callback(data);
+		ipcRenderer.on("download-progress", listener);
+		return () => ipcRenderer.removeListener("download-progress", listener);
+	},
 });

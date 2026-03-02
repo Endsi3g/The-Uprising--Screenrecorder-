@@ -65,6 +65,8 @@ interface VideoPlaybackProps {
 	onSelectAnnotation?: (id: string | null) => void;
 	onAnnotationPositionChange?: (id: string, position: { x: number; y: number }) => void;
 	onAnnotationSizeChange?: (id: string, size: { width: number; height: number }) => void;
+	cursorTelemetry?: import("./types").CursorTelemetryPoint[];
+	showCursorHighlighter?: boolean;
 }
 
 export interface VideoPlaybackRef {
@@ -106,6 +108,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 			onSelectAnnotation,
 			onAnnotationPositionChange,
 			onAnnotationSizeChange,
+			cursorTelemetry = [],
+			showCursorHighlighter = true,
 		},
 		ref,
 	) => {
@@ -115,6 +119,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		const videoSpriteRef = useRef<Sprite | null>(null);
 		const videoContainerRef = useRef<Container | null>(null);
 		const cameraContainerRef = useRef<Container | null>(null);
+		const cursorContainerRef = useRef<Container | null>(null);
+		const cursorGraphicsRef = useRef<Graphics | null>(null);
 		const timeUpdateAnimationRef = useRef<number | null>(null);
 		const [pixiReady, setPixiReady] = useState(false);
 		const [videoReady, setVideoReady] = useState(false);
@@ -144,6 +150,8 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		const layoutVideoContentRef = useRef<(() => void) | null>(null);
 		const trimRegionsRef = useRef<TrimRegion[]>([]);
 		const motionBlurEnabledRef = useRef(motionBlurEnabled);
+		const cursorTelemetryRef = useRef<import("./types").CursorTelemetryPoint[]>([]);
+		const showCursorHighlighterRef = useRef(showCursorHighlighter);
 		const videoReadyRafRef = useRef<number | null>(null);
 
 		const clampFocusToStage = useCallback((focus: ZoomFocus, depth: ZoomDepth) => {
@@ -368,6 +376,11 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		}, [motionBlurEnabled]);
 
 		useEffect(() => {
+			cursorTelemetryRef.current = cursorTelemetry;
+			showCursorHighlighterRef.current = showCursorHighlighter;
+		}, [cursorTelemetry, showCursorHighlighter]);
+
+		useEffect(() => {
 			if (!pixiReady || !videoReady) return;
 
 			const app = appRef.current;
@@ -517,6 +530,15 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				const videoContainer = new Container();
 				videoContainerRef.current = videoContainer;
 				cameraContainer.addChild(videoContainer);
+
+				// Create cursor container - on top of everything
+				const cursorContainer = new Container();
+				cursorContainerRef.current = cursorContainer;
+				app.stage.addChild(cursorContainer);
+
+				const cursorGraphics = new Graphics();
+				cursorGraphicsRef.current = cursorGraphics;
+				cursorContainer.addChild(cursorGraphics);
 
 				setPixiReady(true);
 			})();
@@ -741,6 +763,69 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				);
 
 				applyTransform(motionIntensity);
+
+				// Update cursor highlighter
+				if (cursorGraphicsRef.current) {
+					const graphics = cursorGraphicsRef.current;
+					graphics.clear();
+
+					if (showCursorHighlighterRef.current && cursorTelemetryRef.current.length > 0) {
+						const currentTimeMs = currentTimeRef.current * 1000;
+						const samples = cursorTelemetryRef.current;
+
+						// Find closest sample
+						let closest = samples[0];
+						let minDiff = Math.abs(samples[0].timeMs - currentTimeMs);
+
+						for (const sample of samples) {
+							const diff = Math.abs(sample.timeMs - currentTimeMs);
+							if (diff < minDiff) {
+								minDiff = diff;
+								closest = sample;
+							}
+						}
+
+						// Only show if we have a reasonably close sample (within 200ms)
+						if (minDiff < 200) {
+							// Convert normalized coordinates to stage coordinates
+							const sprite = videoSpriteRef.current;
+							if (sprite && sprite.visible) {
+								// Sample coordinate is 0..1 relative to original recording
+								// We need to map it through the current zoom transform applied to videoContainer
+								// The videoSprite is inside videoContainer which is inside cameraContainer
+								// But we are drawing in cursorContainer which is directly on stage
+								
+								// Get global position of the center of the video in the original recording
+								// For now, assume simple mapping if sprite is filling the container
+								// We need to account for depth and focus
+								const state = animationStateRef.current;
+								
+								// Calculate stage coordinates from normalized ones
+								// This needs to match the zoom math in applyZoomTransform
+								const stageWidth = stageSizeRef.current.width;
+								const stageHeight = stageSizeRef.current.height;
+								
+								// Normalized center of view in stage coordinates
+								const stageCenterX = stageWidth / 2;
+								const stageCenterY = stageHeight / 2;
+								
+								// Point relative to focus, scaled by zoom
+								const stageX = stageCenterX + (closest.cx - state.focusX) * stageWidth * state.scale;
+								const stageY = stageCenterY + (closest.cy - state.focusY) * stageHeight * state.scale;
+
+								graphics.beginFill(0x3B82F6, 0.4);
+								graphics.lineStyle(2, 0x3B82F6, 0.8);
+								graphics.drawCircle(stageX, stageY, 20);
+								graphics.endFill();
+
+								// Inner dot
+								graphics.beginFill(0xFFFFFF, 1);
+								graphics.drawCircle(stageX, stageY, 4);
+								graphics.endFill();
+							}
+						}
+					}
+				}
 			};
 
 			app.ticker.add(ticker);

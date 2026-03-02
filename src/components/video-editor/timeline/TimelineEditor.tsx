@@ -4,6 +4,7 @@ import {
 	Check,
 	ChevronDown,
 	MessageSquare,
+	MousePointer2,
 	Plus,
 	Scissors,
 	WandSparkles,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -77,6 +79,8 @@ interface TimelineEditorProps {
 	onSelectCaption?: (id: string | null) => void;
 	aspectRatio: AspectRatio;
 	onAspectRatioChange: (aspectRatio: AspectRatio) => void;
+	showCursorHighlighter?: boolean;
+	onShowCursorHighlighterChange?: (show: boolean) => void;
 }
 
 interface TimelineScaleConfig {
@@ -657,6 +661,8 @@ export default function TimelineEditor({
 	onSelectCaption,
 	aspectRatio,
 	onAspectRatioChange,
+	showCursorHighlighter = true,
+	onShowCursorHighlighterChange,
 }: TimelineEditorProps) {
 	const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
 	const currentTimeMs = useMemo(() => Math.round(currentTime * 1000), [currentTime]);
@@ -1275,6 +1281,16 @@ export default function TimelineEditor({
 					</DropdownMenu>
 					<div className="w-[1px] h-4 bg-white/10" />
 					<TutorialHelp />
+					<div className="w-[1px] h-4 bg-white/10" />
+					<div className="flex items-center gap-2 px-2">
+						<MousePointer2 className="w-3.5 h-3.5 text-slate-400" />
+						<span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Cursor</span>
+						<Switch 
+							checked={showCursorHighlighter} 
+							onCheckedChange={onShowCursorHighlighterChange}
+							className="scale-75"
+						/>
+					</div>
 				</div>
 				<div className="flex-1" />
 				<div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MdVideocam, MdVideocamOff } from "react-icons/md";
+import { MdMic, MdVideocam, MdVideocamOff } from "react-icons/md";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import styles from "./SourceSelector.module.css";
@@ -19,6 +19,8 @@ export function SourceSelector() {
 	const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
 	const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
 	const [cameraEnabled, setCameraEnabled] = useState(false);
+	const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+	const [selectedMic, setSelectedMic] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function fetchSources() {
@@ -64,7 +66,21 @@ export function SourceSelector() {
 				console.error("Error loading cameras:", error);
 			}
 		}
+
+		async function fetchAudioDevices() {
+			try {
+				const devices = await navigator.mediaDevices.enumerateDevices();
+				const micDevices = devices.filter((d) => d.kind === "audioinput");
+				setMicrophones(micDevices);
+
+				const lastMic = await window.electronAPI.getSelectedMic();
+				setSelectedMic(lastMic || micDevices[0]?.deviceId || null);
+			} catch (error) {
+				console.error("Error loading microphones:", error);
+			}
+		}
 		fetchCameras();
+		fetchAudioDevices();
 	}, []);
 
 	const screenSources = sources.filter((s) => s.id.startsWith("screen:"));
@@ -76,6 +92,7 @@ export function SourceSelector() {
 		if (selectedSource) {
 			await window.electronAPI.setSelectedCamera(selectedCamera);
 			await window.electronAPI.toggleCameraEnabled(cameraEnabled);
+			await window.electronAPI.setSelectedMic(selectedMic);
 			await window.electronAPI.selectSource(selectedSource);
 		}
 	};
@@ -137,6 +154,7 @@ export function SourceSelector() {
 										<div
 											key={source.id}
 											onClick={() => handleSourceSelect(source)}
+											onDoubleClick={handleShare}
 											className={`relative flex flex-col items-center gap-2 p-2 rounded-lg cursor-pointer border transition-all ${
 												selectedSource?.id === source.id
 													? "border-blue-500 bg-blue-500/10"
@@ -210,7 +228,7 @@ export function SourceSelector() {
 							</div>
 						</TabsContent>
 						<TabsContent value="camera" className="h-full">
-							<div className="flex flex-col gap-4 p-4">
+							<div className="flex flex-col gap-4 p-4 overflow-y-auto max-h-72 custom-scrollbar">
 								<div className="flex items-center justify-between bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
 									<div className="flex items-center gap-3">
 										{cameraEnabled ? (
@@ -234,34 +252,67 @@ export function SourceSelector() {
 									</Button>
 								</div>
 
-								<div className="space-y-2">
-									<label className="text-[10px] text-zinc-500 uppercase font-bold px-1">
-										Select Device
-									</label>
-									<div className="grid grid-cols-1 gap-2 overflow-y-auto max-h-40 pr-1 custom-scrollbar">
-										{cameras.map((device) => (
-											<div
-												key={device.deviceId}
-												onClick={() => setSelectedCamera(device.deviceId)}
-												className={`flex items-center gap-2 p-2 rounded-md cursor-pointer border transition-all ${
-													selectedCamera === device.deviceId
-														? "bg-blue-600/10 border-blue-500/50 text-blue-400"
-														: "bg-zinc-900/20 border-zinc-800 text-zinc-400 hover:bg-zinc-800/40"
-												}`}
-											>
+								<div className="space-y-4">
+									<div className="space-y-2">
+										<label className="text-[10px] text-zinc-500 uppercase font-bold px-1">
+											Select Camera
+										</label>
+										<div className="grid grid-cols-1 gap-2">
+											{cameras.map((device) => (
 												<div
-													className={`w-2 h-2 rounded-full ${selectedCamera === device.deviceId ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : "bg-zinc-700"}`}
-												/>
-												<span className="text-xs truncate">
-													{device.label || `Camera ${device.deviceId.slice(0, 5)}...`}
-												</span>
-											</div>
-										))}
-										{cameras.length === 0 && (
-											<div className="text-center py-4 text-zinc-500 text-xs italic">
-												No cameras found
-											</div>
-										)}
+													key={device.deviceId}
+													onClick={() => setSelectedCamera(device.deviceId)}
+													className={`flex items-center gap-2 p-2 rounded-md cursor-pointer border transition-all ${
+														selectedCamera === device.deviceId
+															? "bg-blue-600/10 border-blue-500/50 text-blue-400"
+															: "bg-zinc-900/20 border-zinc-800 text-zinc-400 hover:bg-zinc-800/40"
+													}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${selectedCamera === device.deviceId ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : "bg-zinc-700"}`}
+													/>
+													<span className="text-xs truncate">
+														{device.label || `Camera ${device.deviceId.slice(0, 5)}...`}
+													</span>
+												</div>
+											))}
+											{cameras.length === 0 && (
+												<div className="text-center py-4 text-zinc-500 text-xs italic">
+													No cameras found
+												</div>
+											)}
+										</div>
+									</div>
+
+									<div className="space-y-2">
+										<label className="text-[10px] text-zinc-500 uppercase font-bold px-1 flex items-center gap-1">
+											<MdMic size={12} /> Microphone Selection
+										</label>
+										<div className="grid grid-cols-1 gap-2">
+											{microphones.map((device) => (
+												<div
+													key={device.deviceId}
+													onClick={() => setSelectedMic(device.deviceId)}
+													className={`flex items-center gap-2 p-2 rounded-md cursor-pointer border transition-all ${
+														selectedMic === device.deviceId
+															? "bg-emerald-600/10 border-emerald-500/50 text-emerald-400"
+															: "bg-zinc-900/20 border-zinc-800 text-zinc-400 hover:bg-zinc-800/40"
+													}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${selectedMic === device.deviceId ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-zinc-700"}`}
+													/>
+													<span className="text-xs truncate">
+														{device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
+													</span>
+												</div>
+											))}
+											{microphones.length === 0 && (
+												<div className="text-center py-4 text-zinc-500 text-xs italic">
+													No microphones found
+												</div>
+											)}
+										</div>
 									</div>
 								</div>
 							</div>

@@ -97,6 +97,7 @@ export default function VideoEditor({
 	const [customExportHeight, setCustomExportHeight] = useState(1080);
 	const [customExportBitrate, setCustomExportBitrate] = useState(30);
 	const [playbackRate, setPlaybackRate] = useState(1);
+	const [showCursorHighlighter, setShowCursorHighlighter] = useState(true);
 
 	const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
 	const nextZoomIdRef = useRef(1);
@@ -139,6 +140,7 @@ export default function VideoEditor({
 		borderRadius,
 		padding,
 		aspectRatio,
+		showCursorHighlighter,
 		playbackRate,
 	]);
 
@@ -172,6 +174,8 @@ export default function VideoEditor({
 				if (data.padding !== undefined) setPadding(data.padding);
 				if (data.aspectRatio !== undefined) setAspectRatio(data.aspectRatio);
 				if (data.playbackRate !== undefined) setPlaybackRate(data.playbackRate);
+				if (data.showCursorHighlighter !== undefined)
+					setShowCursorHighlighter(data.showCursorHighlighter);
 
 				clearHistory();
 				lastSavedProjectDataRef.current = dataStr;
@@ -1000,6 +1004,13 @@ export default function VideoEditor({
 							toast.info("Export cancelled");
 						} else if (saveResult.success) {
 							toast.success(`Video exported successfully to ${saveResult.path}`);
+							// Send OS notification
+							if ((window.electronAPI as any).sendNotification) {
+								(window.electronAPI as any).sendNotification({
+									title: "Export Complete",
+									body: `Your video has been saved to ${saveResult.path}`,
+								});
+							}
 						} else {
 							setExportError(saveResult.message || "Failed to save video");
 							toast.error(saveResult.message || "Failed to save video");
@@ -1028,8 +1039,9 @@ export default function VideoEditor({
 					} else if (type === "done") {
 						await handleExportResult(result, settings.format === "gif" ? "gif" : "mp4");
 					} else if (type === "error") {
-						setExportError(error || "Export failed");
-						toast.error(`Export failed: ${error || "Unknown error"}`);
+						const errStr = error || (result && result.error) || "Export failed";
+						setExportError(errStr);
+						toast.error(`Export failed: ${errStr}`);
 						setIsExporting(false);
 						if (exporterRef.current) {
 							exporterRef.current.terminate();
@@ -1082,6 +1094,7 @@ export default function VideoEditor({
 						annotationRegions,
 						captionRegions,
 						cursorTelemetry,
+						showCursorHighlighter,
 						playbackRate,
 						previewWidth,
 						previewHeight,
@@ -1197,6 +1210,7 @@ export default function VideoEditor({
 						annotationRegions,
 						captionRegions,
 						cursorTelemetry,
+						showCursorHighlighter,
 						playbackRate,
 						previewWidth,
 						previewHeight,
@@ -1406,6 +1420,7 @@ export default function VideoEditor({
 											onSelectAnnotation={handleSelectAnnotation}
 											onAnnotationPositionChange={handleAnnotationPositionChange}
 											onAnnotationSizeChange={handleAnnotationSizeChange}
+											showCursorHighlighter={showCursorHighlighter}
 										/>
 									</div>
 								</div>
@@ -1506,6 +1521,8 @@ export default function VideoEditor({
 									onSelectCaption={setSelectedCaptionId}
 									aspectRatio={aspectRatio}
 									onAspectRatioChange={setAspectRatio}
+									showCursorHighlighter={showCursorHighlighter}
+									onShowCursorHighlighterChange={setShowCursorHighlighter}
 								/>
 							</div>
 						</Panel>

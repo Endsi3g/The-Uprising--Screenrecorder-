@@ -28,6 +28,7 @@ interface VideoExporterConfig extends ExportConfig {
 	annotationRegions?: AnnotationRegion[];
 	captionRegions?: CaptionRegion[];
 	cursorTelemetry?: CursorTelemetryPoint[];
+	showCursorHighlighter?: boolean;
 	previewWidth?: number;
 	previewHeight?: number;
 	onProgress?: (progress: ExportProgress) => void;
@@ -85,6 +86,7 @@ export class VideoExporter {
 				annotationRegions: this.config.annotationRegions,
 				captionRegions: this.config.captionRegions,
 				cursorTelemetry: this.config.cursorTelemetry,
+				showCursorHighlighter: this.config.showCursorHighlighter,
 				previewWidth: this.config.previewWidth,
 				previewHeight: this.config.previewHeight,
 			});
@@ -190,11 +192,12 @@ export class VideoExporter {
 			const blob = await this.muxer!.finalize();
 
 			return { success: true, blob };
-		} catch (error) {
+		} catch (error: any) {
 			console.error("Export error:", error);
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : String(error),
+				error: errorMessage || "Unknown error during export process",
 			};
 		} finally {
 			this.cleanup();

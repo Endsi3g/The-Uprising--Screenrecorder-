@@ -83,6 +83,9 @@ interface Window {
 		toggleCameraEnabled: (enabled?: boolean) => Promise<boolean>;
 		getCameraEnabled: () => Promise<boolean>;
 		toggleCameraOverlay: () => Promise<boolean>;
+		sendNotification: (opts: { title: string; body: string; silent?: boolean }) => Promise<{ success: boolean; error?: string }>;
+		setSelectedMic: (deviceId: string | null) => Promise<{ success: boolean }>;
+		getSelectedMic: () => Promise<string | null>;
 	};
 }
 
