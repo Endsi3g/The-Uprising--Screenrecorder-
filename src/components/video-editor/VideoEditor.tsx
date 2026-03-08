@@ -26,12 +26,14 @@ import { ExportDialog } from "./ExportDialog";
 import PlaybackControls from "./PlaybackControls";
 import { ProjectMenu } from "./ProjectMenu";
 import { SettingsPanel } from "./SettingsPanel";
+import { useAudioAnalyzer } from "@/hooks/useAudioAnalyzer";
 import TimelineEditor from "./timeline/TimelineEditor";
 import {
 	type AnnotationRegion,
 	type CaptionRegion,
 	type CropRegion,
 	type CursorTelemetryPoint,
+	type HighlightRegion,
 	clampFocusToDepth,
 	DEFAULT_ANNOTATION_POSITION,
 	DEFAULT_ANNOTATION_SIZE,
@@ -83,6 +85,8 @@ export default function VideoEditor({
 	const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
 	const [captionRegions, setCaptionRegions] = useState<CaptionRegion[]>([]);
 	const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
+	const [highlightRegions, setHighlightRegions] = useState<HighlightRegion[]>([]);
+	const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null);
 	const [isExporting, setIsExporting] = useState(false);
 	const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
 	const [exportError, setExportError] = useState<string | null>(null);
@@ -98,6 +102,8 @@ export default function VideoEditor({
 	const [customExportBitrate, setCustomExportBitrate] = useState(30);
 	const [playbackRate, setPlaybackRate] = useState(1);
 	const [showCursorHighlighter, setShowCursorHighlighter] = useState(true);
+
+	const { analyzeVideoAudio, isAnalyzing } = useAudioAnalyzer();
 
 	const videoPlaybackRef = useRef<VideoPlaybackRef>(null);
 	const nextZoomIdRef = useRef(1);
@@ -119,6 +125,7 @@ export default function VideoEditor({
 			trimRegions,
 			annotationRegions,
 			captionRegions,
+			highlightRegions,
 			wallpaper,
 			shadowIntensity,
 			showBlur,
@@ -166,6 +173,7 @@ export default function VideoEditor({
 				if (data.trimRegions !== undefined) setTrimRegions(data.trimRegions);
 				if (data.annotationRegions !== undefined) setAnnotationRegions(data.annotationRegions);
 				if (data.captionRegions !== undefined) setCaptionRegions(data.captionRegions);
+				if (data.highlightRegions !== undefined) setHighlightRegions(data.highlightRegions);
 				if (data.wallpaper !== undefined) setWallpaper(data.wallpaper);
 				if (data.shadowIntensity !== undefined) setShadowIntensity(data.shadowIntensity);
 				if (data.showBlur !== undefined) setShowBlur(data.showBlur);
@@ -193,6 +201,8 @@ export default function VideoEditor({
 		setZoomRegions([]);
 		setTrimRegions([]);
 		setAnnotationRegions([]);
+		setCaptionRegions([]);
+		setHighlightRegions([]);
 		setWallpaper(WALLPAPER_PATHS[0]);
 		setShadowIntensity(0);
 		setShowBlur(false);
@@ -252,16 +262,42 @@ export default function VideoEditor({
 		setTimeout(() => setShowExportDialog(true), 0);
 	}, []);
 
+	const handleSuggestHighlights = useCallback(async () => {
+		if (!videoPath) return;
+		try {
+			toast.info("Analyzing audio for AI highlights...");
+			const highlights = await analyzeVideoAudio(videoPath);
+			
+			if (highlights.length === 0) {
+				toast.info("No significant highlights found in this video.");
+				return;
+			}
+			
+			executeCommand({
+				execute: () => {
+					setHighlightRegions(highlights);
+					setSelectedHighlightId(null);
+					toast.success(`Found ${highlights.length} potential action highlights`);
+				},
+				undo: () => setHighlightRegions([]),
+			});
+		} catch (error) {
+			toast.error("Failed to analyze audio for highlights");
+		}
+	}, [videoPath, analyzeVideoAudio, executeCommand]);
+
 	// Use a ref to keep track of current state without triggering useCallback updates
 	const stateRef = useRef({
 		zoomRegions,
 		trimRegions,
 		annotationRegions,
 		captionRegions,
+		highlightRegions,
 		selectedZoomId,
 		selectedTrimId,
 		selectedAnnotationId,
 		selectedCaptionId,
+		selectedHighlightId,
 	});
 	useEffect(() => {
 		stateRef.current = {
@@ -269,20 +305,24 @@ export default function VideoEditor({
 			trimRegions,
 			annotationRegions,
 			captionRegions,
+			highlightRegions,
 			selectedZoomId,
 			selectedTrimId,
 			selectedAnnotationId,
 			selectedCaptionId,
+			selectedHighlightId,
 		};
 	}, [
 		zoomRegions,
 		trimRegions,
 		annotationRegions,
 		captionRegions,
+		highlightRegions,
 		selectedZoomId,
 		selectedTrimId,
 		selectedAnnotationId,
 		selectedCaptionId,
+		selectedHighlightId,
 	]);
 
 	// Add global keyboard shortcut for Undo/Redo
@@ -445,6 +485,16 @@ export default function VideoEditor({
 		if (id) {
 			setSelectedZoomId(null);
 			setSelectedTrimId(null);
+			setSelectedHighlightId(null);
+		}
+	}, []);
+
+	const handleSelectHighlight = useCallback((id: string | null) => {
+		setSelectedHighlightId(id);
+		if (id) {
+			setSelectedZoomId(null);
+			setSelectedTrimId(null);
+			setSelectedAnnotationId(null);
 		}
 	}, []);
 
@@ -1519,6 +1569,11 @@ export default function VideoEditor({
 									onCaptionDelete={handleCaptionDelete}
 									selectedCaptionId={selectedCaptionId}
 									onSelectCaption={setSelectedCaptionId}
+									highlightRegions={highlightRegions}
+									selectedHighlightId={selectedHighlightId}
+									onSelectHighlight={handleSelectHighlight}
+									onSuggestHighlights={handleSuggestHighlights}
+									isAnalyzingHighlights={isAnalyzing}
 									aspectRatio={aspectRatio}
 									onAspectRatioChange={setAspectRatio}
 									showCursorHighlighter={showCursorHighlighter}

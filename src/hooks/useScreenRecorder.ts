@@ -279,23 +279,22 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 					
 					if (videoResult.success && videoResult.path) {
 						try {
-							// Update localStorage for dashboard sync
+							// Update via IPC for dashboard sync
 							const newProject = {
 								id: `proj-${Date.now()}`,
 								name: `Recording ${new Date().toLocaleString()}`,
 								lastModified: Date.now(),
 								videoPath: videoResult.path,
 							};
-							const savedProjects = localStorage.getItem("the-screenrecorder-projects");
-							const parsed = savedProjects ? JSON.parse(savedProjects) : [];
-							const projects = Array.isArray(parsed) ? parsed : [];
+							const savedProjects = await window.electronAPI.getDashboardProjects();
+							const projects = Array.isArray(savedProjects) ? savedProjects : [];
 
 							const updatedProjects = [newProject, ...projects];
-							localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+							await window.electronAPI.saveDashboardProjects(updatedProjects);
 							console.log("Recorded video saved and added to projects");
 						} catch (storageError) {
-							console.error("Error managing localStorage projects:", storageError);
-							window.alert("Erreur: Impossible de sauvegarder le projet dans le stockage local.");
+							console.error("Error managing IPC projects:", storageError);
+							window.alert("Erreur: Impossible de sauvegarder le projet.");
 						} finally {
 							await window.electronAPI.setCurrentVideoPath(videoResult.path);
 							await window.electronAPI.switchToEditor();

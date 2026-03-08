@@ -2,9 +2,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import cors from "cors";
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Notification, screen, shell } from "electron";
+import electron from "electron";
+const { app, dialog, ipcMain, shell, screen, desktopCapturer, Notification, BrowserWindow } = (electron as any).app ? electron : ((electron as any).default || electron);
 import express from "express";
-import { RECORDINGS_DIR } from "../main";
+
+import { getRecordingsDir } from "../paths";
 
 const CURSOR_TELEMETRY_VERSION = 1;
 const CURSOR_SAMPLE_INTERVAL_MS = 100; // 10Hz sampling
@@ -28,6 +30,11 @@ export function registerIpcHandlers(
 	let selectedMicId: string | null = null;
 	let currentVideoPath: string | null = null;
 	let cameraOverlayWin: BrowserWindow | null = null;
+
+	// Mobile remote-control state
+	let mobileIsRecording = false;
+	let mobileRecordingStartMs = 0;
+	let mobileSourceName = "";
 
 	let activeCursorSamples: CursorTelemetryPoint[] = [];
 	let pendingCursorSamples: CursorTelemetryPoint[] = [];
@@ -167,16 +174,158 @@ export function registerIpcHandlers(
 		}
 	});
 
+	const getIdeasPath = () => path.join(app.getPath("userData"), "ideas.json");
+	const getProjectsPath = () => path.join(app.getPath("userData"), "projects.json");
+
+	const loadJson = async (filePath: string) => {
+		try {
+			const data = await fs.readFile(filePath, "utf-8");
+			return JSON.parse(data);
+		} catch {
+			return [];
+		}
+	};
+
+	const saveJson = async (filePath: string, data: any) => {
+		await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+	};
+
+	ipcMain.handle("get-ideas", async () => loadJson(getIdeasPath()));
+	ipcMain.handle("save-ideas", async (_, ideas) => {
+		await saveJson(getIdeasPath(), ideas);
+		return { success: true };
+	});
+	ipcMain.handle("get-dashboard-projects", async () => loadJson(getProjectsPath()));
+	ipcMain.handle("save-dashboard-projects", async (_, projects) => {
+		await saveJson(getProjectsPath(), projects);
+		return { success: true };
+	});
+
 	// Start a tiny dashboard server for mobile access
 	const mobileApp = express();
 	mobileApp.use(express.json());
 	mobileApp.use(cors());
 
+	// ─── Projects & Ideas ───────────────────────────────────────────────────────
 	mobileApp.get("/api/projects", async (_req: any, res: any) => {
-		res.json({ message: "Dashboard mobile access active" });
+		const projects = await loadJson(getProjectsPath());
+		res.json(projects);
 	});
 
-	// Detect local IP for mobile access
+	mobileApp.post("/api/projects", async (req: any, res: any) => {
+		try {
+			await saveJson(getProjectsPath(), req.body);
+			res.json({ success: true });
+		} catch (error) {
+			res.status(500).json({ success: false, error: String(error) });
+		}
+	});
+
+	mobileApp.get("/api/ideas", async (_req: any, res: any) => {
+		const ideas = await loadJson(getIdeasPath());
+		res.json(ideas);
+	});
+
+	mobileApp.post("/api/ideas", async (req: any, res: any) => {
+		try {
+			await saveJson(getIdeasPath(), req.body);
+			res.json({ success: true });
+		} catch (error) {
+			res.status(500).json({ success: false, error: String(error) });
+		}
+	});
+
+	// ─── Recording Control & Status ──────────────────────────────────────────────
+	/**
+	 * GET /api/recording/status
+	 * Returns { isRecording, sourceName, elapsed } for the mobile UI to poll.
+	 */
+	mobileApp.get("/api/recording/status", (_req: any, res: any) => {
+		const elapsed = mobileIsRecording
+			? Math.floor((Date.now() - mobileRecordingStartMs) / 1000)
+			: 0;
+		res.json({
+			isRecording: mobileIsRecording,
+			sourceName: mobileSourceName,
+			elapsed,
+		});
+	});
+
+	/**
+	 * POST /api/recording/start
+	 * Instructs the renderer to begin recording (if not already).
+	 */
+	mobileApp.post("/api/recording/start", (_req: any, res: any) => {
+		if (mobileIsRecording) {
+			res.json({ success: false, message: "Already recording" });
+			return;
+		}
+		const wins = BrowserWindow.getAllWindows();
+		if (wins.length === 0) {
+			res.status(503).json({ success: false, message: "No renderer window" });
+			return;
+		}
+		const mainWin = getMainWindow() ?? wins[0];
+		if (!mainWin || mainWin.isDestroyed()) {
+			res.status(503).json({ success: false, message: "Main window unavailable" });
+			return;
+		}
+		mainWin.webContents.send("remote-start-recording");
+		res.json({ success: true });
+	});
+
+	/**
+	 * POST /api/recording/stop
+	 * Instructs the renderer to stop recording.
+	 */
+	mobileApp.post("/api/recording/stop", (_req: any, res: any) => {
+		if (!mobileIsRecording) {
+			res.json({ success: false, message: "Not recording" });
+			return;
+		}
+		const wins = BrowserWindow.getAllWindows();
+		if (wins.length === 0) {
+			res.status(503).json({ success: false, message: "No renderer window" });
+			return;
+		}
+		const mainWin = getMainWindow() ?? wins[0];
+		if (!mainWin || mainWin.isDestroyed()) {
+			res.status(503).json({ success: false, message: "Main window unavailable" });
+			return;
+		}
+		mainWin.webContents.send("remote-stop-recording");
+		res.json({ success: true });
+	});
+
+	/**
+	 * GET /api/preview
+	 * Captures the main BrowserWindow as a PNG and returns it base64-encoded.
+	 * The mobile app can display this as a live preview thumbnail.
+	 */
+	mobileApp.get("/api/preview", async (_req: any, res: any) => {
+		try {
+			const wins = BrowserWindow.getAllWindows();
+			const mainWin = getMainWindow() ?? wins[0];
+			if (!mainWin || mainWin.isDestroyed()) {
+				res.status(503).json({ success: false, message: "No window to capture" });
+				return;
+			}
+			const image = await mainWin.webContents.capturePage();
+			const resized = image.resize({ width: 320 });
+			const base64 = resized.toPNG().toString("base64");
+			res.json({
+				success: true,
+				thumbnail: `data:image/png;base64,${base64}`,
+				width: resized.getSize().width,
+				height: resized.getSize().height,
+			});
+		} catch (error) {
+			console.error("Failed to capture preview:", error);
+			res.status(500).json({ success: false, error: String(error) });
+		}
+	});
+
+	// ─── Detect local IP ─────────────────────────────────────────────────────────
 	const getLocalIp = () => {
 		const interfaces = os.networkInterfaces();
 		for (const name of Object.keys(interfaces)) {
@@ -257,7 +406,7 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("store-recorded-video", async (_, videoData: ArrayBuffer, fileName: string) => {
 		try {
-			const videoPath = path.join(RECORDINGS_DIR, fileName);
+			const videoPath = path.join(getRecordingsDir(), fileName);
 			await fs.writeFile(videoPath, Buffer.from(videoData));
 			currentVideoPath = videoPath;
 
@@ -292,7 +441,7 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("get-recorded-video-path", async () => {
 		try {
-			const files = await fs.readdir(RECORDINGS_DIR);
+			const files = await fs.readdir(getRecordingsDir());
 			const videoFiles = files.filter((file) => file.endsWith(".webm"));
 
 			if (videoFiles.length === 0) {
@@ -300,7 +449,7 @@ export function registerIpcHandlers(
 			}
 
 			const latestVideo = videoFiles.sort().reverse()[0];
-			const videoPath = path.join(RECORDINGS_DIR, latestVideo);
+			const videoPath = path.join(getRecordingsDir(), latestVideo);
 
 			return { success: true, path: videoPath };
 		} catch (error) {
@@ -324,9 +473,22 @@ export function registerIpcHandlers(
 		}
 
 		const source = selectedSource || { name: "Screen" };
+		// Update mobile API state
+		mobileIsRecording = recording;
+		mobileSourceName = source.name;
+		if (recording) mobileRecordingStartMs = Date.now();
+
 		if (onRecordingStateChange) {
 			onRecordingStateChange(recording, source.name);
 		}
+	});
+
+	// IPC — let renderer query current recording state (used by mobile status endpoint)
+	ipcMain.handle("get-recording-status", () => {
+		const elapsed = mobileIsRecording
+			? Math.floor((Date.now() - mobileRecordingStartMs) / 1000)
+			: 0;
+		return { isRecording: mobileIsRecording, sourceName: mobileSourceName, elapsed };
 	});
 
 	ipcMain.handle("get-cursor-telemetry", async (_, videoPath?: string) => {
@@ -338,7 +500,7 @@ export function registerIpcHandlers(
 		// Sanitize input to prevent path traversal
 		// Resolve filename only and join with recordings directory
 		const fileName = path.basename(inputPath);
-		const telemetryPath = path.join(RECORDINGS_DIR, `${fileName}.cursor.json`);
+		const telemetryPath = path.join(getRecordingsDir(), `${fileName}.cursor.json`);
 		try {
 			const content = await fs.readFile(telemetryPath, "utf-8");
 			const parsed = JSON.parse(content);
@@ -459,7 +621,7 @@ export function registerIpcHandlers(
 		try {
 			const result = await dialog.showOpenDialog({
 				title: "Select Video File",
-				defaultPath: RECORDINGS_DIR,
+				defaultPath: getRecordingsDir(),
 				filters: [
 					{ name: "Video Files", extensions: ["webm", "mp4", "mov", "avi", "mkv"] },
 					{ name: "All Files", extensions: ["*"] },

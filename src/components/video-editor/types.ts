@@ -139,6 +139,13 @@ export interface CaptionRegion {
 	style: AnnotationTextStyle;
 }
 
+export interface HighlightRegion {
+	id: string;
+	startMs: number;
+	endMs: number;
+	intensity: number; // Normalized 0-1
+}
+
 export function clampFocusToDepth(focus: ZoomFocus, _depth: ZoomDepth): ZoomFocus {
 	return {
 		cx: clamp(focus.cx, 0, 1),

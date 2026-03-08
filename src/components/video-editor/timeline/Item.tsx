@@ -1,6 +1,6 @@
 import type { Span } from "dnd-timeline";
 import { useItem } from "dnd-timeline";
-import { MessageSquare, Scissors, ZoomIn } from "lucide-react";
+import { MessageSquare, Scissors, ZoomIn, WandSparkles } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import glassStyles from "./ItemGlass.module.css";
@@ -13,7 +13,7 @@ interface ItemProps {
 	isSelected?: boolean;
 	onSelect?: () => void;
 	zoomDepth?: number;
-	variant?: "zoom" | "trim" | "annotation" | "caption";
+	variant?: "zoom" | "trim" | "annotation" | "caption" | "highlight";
 }
 
 // Map zoom depth to multiplier labels
@@ -55,16 +55,19 @@ export default function Item({
 	const isZoom = variant === "zoom";
 	const isTrim = variant === "trim";
 	const isCaption = variant === "caption";
+	const isHighlight = variant === "highlight";
 
 	const glassClass = isZoom
 		? glassStyles.glassGreen
 		: isTrim
 			? glassStyles.glassRed
-			: isCaption
-				? glassStyles.glassYellow // Reuse yellow for captions too
-				: glassStyles.glassYellow;
+			: isHighlight
+				? glassStyles.glassPurple
+				: isCaption
+					? glassStyles.glassYellow // Reuse yellow for captions too
+					: glassStyles.glassYellow;
 
-	const endCapColor = isZoom ? "#21916A" : isTrim ? "#ef4444" : "#B4A046"; // Golden/Yellow
+	const endCapColor = isZoom ? "#21916A" : isTrim ? "#ef4444" : isHighlight ? "#9333ea" : "#B4A046"; // Purple for highlights
 
 	const timeLabel = useMemo(
 		() => `${formatMs(span.start)} – ${formatMs(span.end)}`,
@@ -135,6 +138,13 @@ export default function Item({
 							) : isCaption ? (
 								<>
 									<MessageSquare className="w-3.5 h-3.5 shrink-0 text-yellow-400" />
+									<span className="text-[11px] font-semibold tracking-tight whitespace-nowrap">
+										{children}
+									</span>
+								</>
+							) : isHighlight ? (
+								<>
+									<WandSparkles className="w-3.5 h-3.5 shrink-0 text-purple-400" />
 									<span className="text-[11px] font-semibold tracking-tight whitespace-nowrap">
 										{children}
 									</span>

@@ -77,6 +77,13 @@ interface Window {
 		downloadVideo: (
 			url: string,
 		) => Promise<{ success: boolean; message: string; error?: string; output?: string }>;
+
+		// Dashboard Data
+		getIdeas: () => Promise<any[]>;
+		saveIdeas: (ideas: any[]) => Promise<{ success: boolean }>;
+		getDashboardProjects: () => Promise<any[]>;
+		saveDashboardProjects: (projects: any[]) => Promise<{ success: boolean }>;
+
 		// WebCam support
 		setSelectedCamera: (deviceId: string | null) => Promise<{ success: boolean }>;
 		getSelectedCamera: () => Promise<string | null>;
@@ -86,6 +93,13 @@ interface Window {
 		sendNotification: (opts: { title: string; body: string; silent?: boolean }) => Promise<{ success: boolean; error?: string }>;
 		setSelectedMic: (deviceId: string | null) => Promise<{ success: boolean }>;
 		getSelectedMic: () => Promise<string | null>;
+		onDownloadProgress: (callback: (data: { progress: number; url: string }) => void) => () => void;
+
+		// Mobile Connect
+		getMobileConnectionInfo: () => Promise<{ ip: string; port: number; url: string }>;
+		getRecordingStatus: () => Promise<{ isRecording: boolean; sourceName: string; elapsed: number }>;
+		onRemoteStartRecording: (callback: () => void) => () => void;
+		onRemoteStopRecording: (callback: () => void) => () => void;
 	};
 }
 

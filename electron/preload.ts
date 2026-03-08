@@ -93,6 +93,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getMobileConnectionInfo: () => {
 		return ipcRenderer.invoke("get-mobile-connection-info");
 	},
+	getRecordingStatus: () => {
+		return ipcRenderer.invoke("get-recording-status");
+	},
+	onRemoteStartRecording: (callback: () => void) => {
+		const listener = () => callback();
+		ipcRenderer.on("remote-start-recording", listener);
+		return () => ipcRenderer.removeListener("remote-start-recording", listener);
+	},
+	onRemoteStopRecording: (callback: () => void) => {
+		const listener = () => callback();
+		ipcRenderer.on("remote-stop-recording", listener);
+		return () => ipcRenderer.removeListener("remote-stop-recording", listener);
+	},
+	getIdeas: () => {
+		return ipcRenderer.invoke("get-ideas");
+	},
+	saveIdeas: (ideas: any[]) => {
+		return ipcRenderer.invoke("save-ideas", ideas);
+	},
+	getDashboardProjects: () => {
+		return ipcRenderer.invoke("get-dashboard-projects");
+	},
+	saveDashboardProjects: (projects: any[]) => {
+		return ipcRenderer.invoke("save-dashboard-projects", projects);
+	},
 	sendNotification: (opts: { title: string; body: string; silent?: boolean }) => {
 		return ipcRenderer.invoke("send-notification", opts);
 	},

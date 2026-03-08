@@ -1,13 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, Menu, nativeImage, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } from "electron";
+import { autoUpdater } from "electron-updater";
 import { registerIpcHandlers } from "./ipc/handlers";
+import { getRecordingsDir } from "./paths";
 import {
 	createCameraOverlayWindow,
 	createEditorWindow,
 	createHudOverlayWindow,
 	createSourceSelectorWindow,
+	registerWindowsIpcHandlers,
 } from "./windows";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,12 +21,10 @@ app.commandLine.appendSwitch("enable-zero-copy");
 app.commandLine.appendSwitch("enable-hardware-overlays", "single-fullscreen");
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
 
-export const RECORDINGS_DIR = path.join(app.getPath("userData"), "recordings");
-
 async function ensureRecordingsDir() {
 	try {
-		await fs.mkdir(RECORDINGS_DIR, { recursive: true });
-		console.log("RECORDINGS_DIR:", RECORDINGS_DIR);
+		await fs.mkdir(getRecordingsDir(), { recursive: true });
+		console.log("RECORDINGS_DIR:", getRecordingsDir());
 		console.log("User Data Path:", app.getPath("userData"));
 	} catch (error) {
 		console.error("Failed to create recordings directory:", error);
@@ -113,7 +114,18 @@ function updateTrayMenu(recording: boolean = false) {
 			];
 	tray.setImage(trayIcon);
 	tray.setToolTip(trayToolTip);
-	tray.setContextMenu(Menu.buildFromTemplate(menuTemplate));
+
+	const updateMenu = [
+		{ type: "separator" as const },
+		{
+			label: "Check for Updates...",
+			click: () => {
+				autoUpdater.checkForUpdatesAndNotify();
+			},
+		},
+	];
+
+	tray.setContextMenu(Menu.buildFromTemplate([...menuTemplate, ...updateMenu]));
 }
 
 function createEditorWindowWrapper() {
@@ -126,7 +138,7 @@ function createEditorWindowWrapper() {
 
 function createSourceSelectorWindowWrapper() {
 	sourceSelectorWindow = createSourceSelectorWindow();
-	sourceSelectorWindow.on("closed", () => {
+	sourceSelectorWindow?.on("closed", () => {
 		sourceSelectorWindow = null;
 	});
 	return sourceSelectorWindow;
@@ -149,7 +161,6 @@ app.on("activate", () => {
 // Register all IPC handlers when app is ready
 app.whenReady().then(async () => {
 	// Listen for HUD overlay quit event (macOS only)
-	const { ipcMain } = await import("electron");
 	ipcMain.on("hud-overlay-close", () => {
 		app.quit();
 	});
@@ -158,6 +169,7 @@ app.whenReady().then(async () => {
 	// Ensure recordings directory exists
 	await ensureRecordingsDir();
 
+	registerWindowsIpcHandlers();
 	registerIpcHandlers(
 		createEditorWindowWrapper,
 		createSourceSelectorWindowWrapper,
@@ -175,5 +187,15 @@ app.whenReady().then(async () => {
 			return createCameraOverlayWindow();
 		},
 	);
+
+	// Auto Update configuration
+	autoUpdater.on("update-available", () => {
+		console.log("Update available.");
+	});
+	autoUpdater.on("update-downloaded", () => {
+		console.log("Update downloaded; will install in 5 seconds");
+	});
+	autoUpdater.checkForUpdatesAndNotify();
+
 	createWindow();
 });

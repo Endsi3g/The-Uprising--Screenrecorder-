@@ -35,7 +35,11 @@
       }
     ],
     "icon": "icons/icons/mac/icon.icns",
-    "artifactName": "${productName}-Mac-${arch}-${version}-Installer.${ext}"
+    "artifactName": "${productName}-Mac-${arch}-${version}-Installer.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist"
   },
   "linux": {
     "target": [
@@ -49,13 +53,16 @@
     "target": [
       "nsis"
     ],
-    "icon": "icons/icons/win/icon.ico"
+    "icon": "icons/icons/win/icon.ico",
+    "cscLink": "${env.WIN_CSC_LINK}",
+    "cscKeyPassword": "${env.WIN_CSC_KEY_PASSWORD}"
   },
   "publish": [
     {
       "provider": "github",
       "owner": "Endsi3g",
-      "repo": "The-Uprising--Screenrecorder-"
+      "repo": "The-Uprising--Screenrecorder-",
+      "releaseType": "draft"
     }
   ]
 }

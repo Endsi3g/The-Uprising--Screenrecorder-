@@ -5,6 +5,7 @@ import { LaunchWindow } from "./components/launch/LaunchWindow";
 import { SourceSelector } from "./components/launch/SourceSelector";
 import VideoEditor from "./components/video-editor/VideoEditor";
 import { loadAllCustomFonts } from "./lib/customFonts";
+import { initAnalytics, trackEvent } from "./lib/analytics";
 
 export default function App() {
 	const [windowType, setWindowType] = useState("");
@@ -12,6 +13,10 @@ export default function App() {
 	const [selectedVideoPath, setSelectedVideoPath] = useState<string | null>(null);
 
 	useEffect(() => {
+		// Initialize PostHog Analytics
+		initAnalytics();
+		trackEvent("App Open", { view: "initial" });
+
 		const params = new URLSearchParams(window.location.search);
 		const type = params.get("windowType") || "";
 		setWindowType(type);
@@ -21,6 +26,7 @@ export default function App() {
 		if (videoPath) {
 			setSelectedVideoPath(videoPath);
 			setView("editor");
+			trackEvent("Open Project from URL", { path: videoPath });
 		}
 
 		if (type === "hud-overlay" || type === "source-selector") {

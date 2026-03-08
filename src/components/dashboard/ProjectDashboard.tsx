@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChangelogDialog } from "../changelog/ChangelogDialog";
+import { trackEvent } from "@/lib/analytics";
 
 // Simplified inline Badge component to avoid missing module error
 const Badge = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -58,6 +59,8 @@ export default function ProjectDashboard({
 	const [activeTab, setActiveTab] = useState("projects");
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [ideas, setIdeas] = useState<Idea[]>([]);
+	const [newIdeaTitle, setNewIdeaTitle] = useState("");
+	const [newIdeaDescription, setNewIdeaDescription] = useState("");
 	const [downloadUrl, setDownloadUrl] = useState("");
 	const [isDownloading, setIsDownloading] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -79,17 +82,37 @@ export default function ProjectDashboard({
 	}, []);
 
 	useEffect(() => {
-		// Load projects and ideas from localStorage
-		const savedProjects = localStorage.getItem("the-screenrecorder-projects");
-		const savedIdeas = localStorage.getItem("the-screenrecorder-ideas");
+		let isMounted = true;
+		const loadData = async () => {
+			try {
+				const savedProjects = await window.electronAPI.getDashboardProjects();
+				if (isMounted && Array.isArray(savedProjects)) setProjects(savedProjects);
+				
+				const savedIdeas = await window.electronAPI.getIdeas();
+				if (isMounted && Array.isArray(savedIdeas)) setIdeas(savedIdeas);
+			} catch (error) {
+				console.error("Failed to load dashboard data:", error);
+			}
+		};
 
-		if (savedProjects) setProjects(JSON.parse(savedProjects));
-		if (savedIdeas) setIdeas(JSON.parse(savedIdeas));
+		loadData();
+
+		// Set up polling for ideas (to sync from mobile)
+		const pollInterval = setInterval(() => {
+			loadData();
+		}, 5000);
 
 		// Fetch mobile connection info
 		if ((window.electronAPI as any)?.getMobileConnectionInfo) {
-			(window.electronAPI as any).getMobileConnectionInfo().then(setMobileInfo);
+			(window.electronAPI as any).getMobileConnectionInfo().then((info: any) => {
+				if (isMounted) setMobileInfo(info);
+			});
 		}
+
+		return () => {
+			isMounted = false;
+			clearInterval(pollInterval);
+		};
 	}, []);
 
 	const handleDownload = async () => {
@@ -102,6 +125,7 @@ export default function ProjectDashboard({
 			const result = (await window.electronAPI.downloadVideo(downloadUrl)) as any;
 			if (result.success) {
 				toast.success("Download complete!");
+				trackEvent("Video Download Success", { url: downloadUrl });
 				
 				// Create a new project for the downloaded video
 				const fileName = downloadUrl.split("/").pop() || "Downloaded Video";
@@ -115,7 +139,7 @@ export default function ProjectDashboard({
 
 				setProjects((prev) => {
 					const updated = [newProject, ...prev];
-					localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updated));
+					window.electronAPI.saveDashboardProjects(updated).catch(console.error);
 					return updated;
 				});
 				
@@ -123,6 +147,7 @@ export default function ProjectDashboard({
 				setActiveTab("projects"); // Switch to projects tab to see it
 			} else {
 				toast.error(`Download failed: ${result.message}`);
+				trackEvent("Video Download Failure", { url: downloadUrl, message: result.message });
 			}
 		} catch (err) {
 			console.error("Download error:", err);
@@ -142,7 +167,7 @@ export default function ProjectDashboard({
 
 		setProjects((prev) => {
 			const updated = prev.map((p) => (p.id === id ? { ...p, name: trimmedName } : p));
-			localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updated));
+			window.electronAPI.saveDashboardProjects(updated).catch(console.error);
 			return updated;
 		});
 		setRenamingProjectId(null); // Keep original state variable name
@@ -153,7 +178,7 @@ export default function ProjectDashboard({
 		if (window.confirm("Are you sure you want to delete this project?")) {
 			const updatedProjects = projects.filter((p) => p.id !== id);
 			setProjects(updatedProjects);
-			localStorage.setItem("the-screenrecorder-projects", JSON.stringify(updatedProjects));
+			window.electronAPI.saveDashboardProjects(updatedProjects).catch(console.error);
 			toast.success("Project deleted");
 		}
 	};
@@ -162,6 +187,40 @@ export default function ProjectDashboard({
 		setRenamingProjectId(project.id);
 		setRenameValue(project.name);
 		cancelledRenameRef.current = false;
+	};
+
+	const handleSaveIdea = () => {
+		if (!newIdeaTitle.trim()) {
+			toast.error("Idea title is required");
+			return;
+		}
+		const newIdea: Idea = {
+			id: Date.now().toString(),
+			title: newIdeaTitle,
+			description: newIdeaDescription,
+			status: "todo",
+			links: [],
+			createdAt: Date.now(),
+		};
+		setIdeas((prev) => {
+			const updated = [newIdea, ...prev];
+			window.electronAPI.saveIdeas(updated).catch(console.error);
+			return updated;
+		});
+		setNewIdeaTitle("");
+		setNewIdeaDescription("");
+		toast.success("Idea saved");
+	};
+
+	const handleDeleteIdea = (id: string) => {
+		if (window.confirm("Are you sure you want to delete this idea?")) {
+			setIdeas((prev) => {
+				const updated = prev.filter((i) => i.id !== id);
+				window.electronAPI.saveIdeas(updated).catch(console.error);
+				return updated;
+			});
+			toast.success("Idea deleted");
+		}
 	};
 
 	const filteredProjects = projects.filter((p) =>
@@ -244,7 +303,10 @@ export default function ProjectDashboard({
 					<div className="flex items-center gap-4">
 						<ChangelogDialog />
 						<Button
-							onClick={onNewProject}
+							onClick={() => {
+								trackEvent("New Project Clicked");
+								onNewProject();
+							}}
 							className="bg-[#3B82F6] hover:bg-[#2563EB] text-white gap-2 h-9 px-4 font-sans font-medium text-sm rounded-md transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
 						>
 							<Plus size={16} />
@@ -299,7 +361,10 @@ export default function ProjectDashboard({
 													<Button
 														variant="secondary"
 														className="bg-[#3B82F6] text-white hover:bg-[#2563EB] scale-90 group-hover:scale-100 transition-transform"
-														onClick={() => onSelectProject(project.videoPath)}
+														onClick={() => {
+															trackEvent("Open Project", { id: project.id });
+															onSelectProject(project.videoPath);
+														}}
 													>
 														Open Project
 													</Button>
@@ -384,12 +449,20 @@ export default function ProjectDashboard({
 										<Input
 											placeholder="Idea title..."
 											className="bg-[#1A1A1A] border-[#262626] focus-visible:ring-[#3B82F6]"
+											value={newIdeaTitle}
+											onChange={(e) => setNewIdeaTitle(e.target.value)}
 										/>
 										<textarea
 											className="w-full h-32 bg-[#1A1A1A] border border-[#262626] rounded-md p-3 text-sm text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#3B82F6] resize-none"
 											placeholder="Write your thoughts here..."
-										></textarea>
-										<Button className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-md h-9">
+											value={newIdeaDescription}
+											onChange={(e) => setNewIdeaDescription(e.target.value)}
+										/>
+										<Button 
+											className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-md h-9"
+											onClick={handleSaveIdea}
+											disabled={!newIdeaTitle.trim()}
+										>
 											Save Idea
 										</Button>
 									</CardContent>
@@ -435,6 +508,7 @@ export default function ProjectDashboard({
 														variant="ghost"
 														size="sm"
 														className="h-8 text-xs text-gray-400 hover:text-white px-2"
+														onClick={() => handleDeleteIdea(idea.id)}
 													>
 														<Trash2 size={14} className="mr-1" /> Delete
 													</Button>

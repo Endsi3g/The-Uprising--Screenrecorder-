@@ -7,6 +7,8 @@ import {
 	MousePointer2,
 	Plus,
 	Scissors,
+	Sparkles,
+	Loader2,
 	WandSparkles,
 	ZoomIn,
 } from "lucide-react";
@@ -32,6 +34,7 @@ import type {
 	TrimRegion,
 	ZoomFocus,
 	ZoomRegion,
+	HighlightRegion,
 } from "../types";
 import Item from "./Item";
 import KeyframeMarkers from "./KeyframeMarkers";
@@ -43,6 +46,7 @@ const ZOOM_ROW_ID = "row-zoom";
 const TRIM_ROW_ID = "row-trim";
 const ANNOTATION_ROW_ID = "row-annotation";
 const CAPTION_ROW_ID = "row-caption";
+const HIGHLIGHT_ROW_ID = "row-highlight";
 const FALLBACK_RANGE_MS = 1000;
 const TARGET_MARKER_COUNT = 12;
 const SUGGESTION_SPACING_MS = 1800;
@@ -77,6 +81,11 @@ interface TimelineEditorProps {
 	onCaptionDelete?: (id: string) => void;
 	selectedCaptionId?: string | null;
 	onSelectCaption?: (id: string | null) => void;
+	highlightRegions?: HighlightRegion[];
+	onSelectHighlight?: (id: string | null) => void;
+	selectedHighlightId?: string | null;
+	onSuggestHighlights?: () => void;
+	isAnalyzingHighlights?: boolean;
 	aspectRatio: AspectRatio;
 	onAspectRatioChange: (aspectRatio: AspectRatio) => void;
 	showCursorHighlighter?: boolean;
@@ -97,7 +106,7 @@ interface TimelineRenderItem {
 	span: Span;
 	label: string;
 	zoomDepth?: number;
-	variant: "zoom" | "trim" | "annotation" | "caption";
+	variant: "zoom" | "trim" | "annotation" | "caption" | "highlight";
 }
 
 const SCALE_CANDIDATES = [
@@ -442,6 +451,8 @@ function Timeline({
 	selectedTrimId,
 	selectedAnnotationId,
 	selectedCaptionId,
+	selectedHighlightId,
+	onSelectHighlight,
 	keyframes = [],
 }: {
 	items: TimelineRenderItem[];
@@ -453,10 +464,12 @@ function Timeline({
 	onSelectTrim?: (id: string | null) => void;
 	onSelectAnnotation?: (id: string | null) => void;
 	onSelectCaption?: (id: string | null) => void;
+	onSelectHighlight?: (id: string | null) => void;
 	selectedZoomId: string | null;
 	selectedTrimId?: string | null;
 	selectedAnnotationId?: string | null;
 	selectedCaptionId?: string | null;
+	selectedHighlightId?: string | null;
 	keyframes?: { id: string; time: number }[];
 }) {
 	const { setTimelineRef, style, sidebarWidth, range, pixelsToValue } = useTimelineContext();
@@ -480,6 +493,7 @@ function Timeline({
 			onSelectTrim?.(null);
 			onSelectAnnotation?.(null);
 			onSelectCaption?.(null);
+			onSelectHighlight?.(null);
 
 			const rect = e.currentTarget.getBoundingClientRect();
 			const clickX = e.clientX - rect.left - sidebarWidth;
@@ -498,6 +512,7 @@ function Timeline({
 			onSelectTrim,
 			onSelectAnnotation,
 			onSelectCaption,
+			onSelectHighlight,
 			videoDurationMs,
 			sidebarWidth,
 			range.start,
@@ -521,12 +536,13 @@ function Timeline({
 				item.id === selectedZoomId ||
 				item.id === selectedTrimId ||
 				item.id === selectedAnnotationId ||
-				item.id === selectedCaptionId
+				item.id === selectedCaptionId ||
+				item.id === selectedHighlightId
 			)
 				return true;
 			return item.span.end >= renderRange.start && item.span.start <= renderRange.end;
 		},
-		[renderRange, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId],
+		[renderRange, selectedZoomId, selectedTrimId, selectedAnnotationId, selectedCaptionId, selectedHighlightId],
 	);
 
 	const zoomItems = items.filter((item) => item.rowId === ZOOM_ROW_ID && isVisible(item));
@@ -535,6 +551,7 @@ function Timeline({
 		(item) => item.rowId === ANNOTATION_ROW_ID && isVisible(item),
 	);
 	const captionItems = items.filter((item) => item.rowId === CAPTION_ROW_ID && isVisible(item));
+	const highlightItems = items.filter((item) => item.rowId === HIGHLIGHT_ROW_ID && isVisible(item));
 
 	return (
 		<div
@@ -625,6 +642,24 @@ function Timeline({
 					</Item>
 				))}
 			</Row>
+
+			{highlightItems.length > 0 && (
+				<Row id={HIGHLIGHT_ROW_ID} isEmpty={highlightItems.length === 0} hint="AI Highlights">
+					{highlightItems.map((item) => (
+						<Item
+							id={item.id}
+							key={item.id}
+							rowId={item.rowId}
+							span={item.span}
+							isSelected={item.id === selectedHighlightId}
+							onSelect={() => onSelectHighlight?.(item.id)}
+							variant="highlight"
+						>
+							{item.label}
+						</Item>
+					))}
+				</Row>
+			)}
 		</div>
 	);
 }
@@ -659,6 +694,11 @@ export default function TimelineEditor({
 	onCaptionDelete,
 	selectedCaptionId,
 	onSelectCaption,
+	highlightRegions = [],
+	onSelectHighlight,
+	selectedHighlightId,
+	onSuggestHighlights,
+	isAnalyzingHighlights,
 	aspectRatio,
 	onAspectRatioChange,
 	showCursorHighlighter = true,
@@ -1152,20 +1192,28 @@ export default function TimelineEditor({
 				rowId: ANNOTATION_ROW_ID,
 				span: { start: region.startMs, end: region.endMs },
 				label,
-				variant: "annotation" as const,
+				variant: "annotation",
 			};
 		});
 
-		const captions: TimelineRenderItem[] = (captionRegions || []).map((r) => ({
-			id: r.id,
+		const captions: TimelineRenderItem[] = (captionRegions || []).map((region) => ({
+			id: region.id,
 			rowId: CAPTION_ROW_ID,
-			span: { start: r.startMs, end: r.endMs },
-			label: r.text,
-			variant: "caption" as const,
+			span: { start: region.startMs, end: region.endMs },
+			label: region.text,
+			variant: "caption",
 		}));
 
-		return [...zooms, ...trims, ...annotations, ...captions];
-	}, [zoomRegions, trimRegions, annotationRegions, captionRegions]);
+		const highlights: TimelineRenderItem[] = highlightRegions.map((region) => ({
+			id: region.id,
+			rowId: HIGHLIGHT_ROW_ID,
+			span: { start: region.startMs, end: region.endMs },
+			label: "Highlight",
+			variant: "highlight",
+		}));
+
+		return [...zooms, ...trims, ...annotations, ...captions, ...highlights];
+	}, [zoomRegions, trimRegions, annotationRegions, captionRegions, highlightRegions]);
 
 	// Flat list of all non-annotation region spans for neighbour-clamping during drag/resize
 	const allRegionSpans = useMemo(() => {
@@ -1234,6 +1282,20 @@ export default function TimelineEditor({
 						title="Suggest Zooms from Cursor"
 					>
 						<WandSparkles className="w-4 h-4" />
+					</Button>
+					<Button
+						onClick={onSuggestHighlights}
+						disabled={isAnalyzingHighlights}
+						variant="ghost"
+						size="icon"
+						className="h-7 w-7 text-slate-400 hover:text-[#9333ea] hover:bg-[#9333ea]/10 transition-all"
+						title="Suggest AI Highlights"
+					>
+						{isAnalyzingHighlights ? (
+							<Loader2 className="w-4 h-4 animate-spin" />
+						) : (
+							<Sparkles className="w-4 h-4" />
+						)}
 					</Button>
 					<Button
 						onClick={handleAddTrim}
@@ -1341,9 +1403,13 @@ export default function TimelineEditor({
 						onSelectZoom={onSelectZoom}
 						onSelectTrim={onSelectTrim}
 						onSelectAnnotation={onSelectAnnotation}
+						onSelectCaption={onSelectCaption}
 						selectedZoomId={selectedZoomId}
 						selectedTrimId={selectedTrimId}
 						selectedAnnotationId={selectedAnnotationId}
+						selectedCaptionId={selectedCaptionId}
+						onSelectHighlight={onSelectHighlight}
+						selectedHighlightId={selectedHighlightId}
 						keyframes={keyframes}
 					/>
 				</TimelineWrapper>

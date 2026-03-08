@@ -194,6 +194,10 @@ function renderText(
 		}
 
 		ctx.fillStyle = style.color;
+		ctx.strokeStyle = "#000000";
+		ctx.lineWidth = Math.max(2 * scaleFactor, 1);
+		ctx.lineJoin = "round";
+		ctx.strokeText(line, textX, currentY);
 		ctx.fillText(line, textX, currentY);
 
 		if (style.textDecoration === "underline") {

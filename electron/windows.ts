@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BrowserWindow, ipcMain, screen } from "electron";
+import electron from "electron";
+const { BrowserWindow, ipcMain, screen } = (electron as any).BrowserWindow ? electron : ((electron as any).default || electron);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -10,11 +11,13 @@ const RENDERER_DIST = path.join(APP_ROOT, "dist");
 
 let hudOverlayWindow: BrowserWindow | null = null;
 
-ipcMain.on("hud-overlay-hide", () => {
-	if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
-		hudOverlayWindow.minimize();
-	}
-});
+export function registerWindowsIpcHandlers() {
+	ipcMain.on("hud-overlay-hide", () => {
+		if (hudOverlayWindow && !hudOverlayWindow.isDestroyed()) {
+			hudOverlayWindow.minimize();
+		}
+	});
+}
 
 export function createHudOverlayWindow(): BrowserWindow {
 	const primaryDisplay = screen.getPrimaryDisplay();

@@ -2,18 +2,20 @@ import { useEffect, useState } from "react";
 import { BsRecordCircle } from "react-icons/bs";
 import { FaRegStopCircle } from "react-icons/fa";
 import { FaFolderMinus } from "react-icons/fa6";
-import { FiMinus, FiVideo, FiX } from "react-icons/fi";
+import { FiMinus, FiSmartphone, FiVideo, FiX } from "react-icons/fi";
 import { MdMonitor } from "react-icons/md";
 import { RxDragHandleDots2 } from "react-icons/rx";
 import { useScreenRecorder } from "../../hooks/useScreenRecorder";
 import { Button } from "../ui/button";
 import { ContentClamp } from "../ui/content-clamp";
+import { MobileConnectPanel } from "./MobileConnectPanel";
 import styles from "./LaunchWindow.module.css";
 
 export function LaunchWindow() {
 	const { recording, toggleRecording } = useScreenRecorder();
 	const [recordingStart, setRecordingStart] = useState<number | null>(null);
 	const [elapsed, setElapsed] = useState(0);
+	const [showMobilePanel, setShowMobilePanel] = useState(false);
 
 	useEffect(() => {
 		let timer: NodeJS.Timeout | null = null;
@@ -103,8 +105,24 @@ export function LaunchWindow() {
 		}
 	};
 
+	// Listen for remote start/stop commands from the mobile app
+	useEffect(() => {
+		const removeStart = window.electronAPI?.onRemoteStartRecording?.(() => {
+			if (!recording) toggleRecording();
+		});
+		const removeStop = window.electronAPI?.onRemoteStopRecording?.(() => {
+			if (recording) toggleRecording();
+		});
+		return () => {
+			removeStart?.();
+			removeStop?.();
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [recording]);
+
 	return (
 		<div className="w-full h-full flex items-center bg-transparent">
+			{showMobilePanel && <MobileConnectPanel onClose={() => setShowMobilePanel(false)} />}
 			<div
 				className={`w-full max-w-[500px] mx-auto flex items-center justify-between px-4 py-2 ${styles.electronDrag} ${styles.hudBar}`}
 				style={{
@@ -180,6 +198,19 @@ export function LaunchWindow() {
 				>
 					<FiVideo size={14} />
 					<span>Cam</span>
+				</Button>
+
+				<div className="w-px h-6 bg-white/30" />
+
+				<Button
+					variant="link"
+					size="sm"
+					onClick={() => setShowMobilePanel((v) => !v)}
+					className={`gap-1 ${showMobilePanel ? "text-violet-400" : "text-white"} bg-transparent hover:bg-transparent px-0 flex-1 text-center text-xs ${styles.electronNoDrag}`}
+					title="Mobile Connect"
+				>
+					<FiSmartphone size={14} />
+					<span>Mobile</span>
 				</Button>
 
 				{/* Separator before hide/close buttons */}

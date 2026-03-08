@@ -13,8 +13,8 @@ Maintenant que la Phase 5 est livrée, voici les étapes recommandées pour fair
 3. **Système de Plugins**: Permettez aux développeurs de créer des filtres vidéo et des annotations personnalisés.
 
 ## 📱 Connectivité Mobile
-- **Application Mobile**: Transformez le tableau de bord Express actuel en une application React Native complète.
-- **Contrôle à Distance**: Utilisez votre téléphone comme bouton "Démarrer/Arrêter" et comme écran de prévisualisation des annotations.
+- [x] **Application Mobile**: Transformez le tableau de bord Express actuel en une application React Native complète.
+- [x] **Contrôle à Distance**: Utilisez votre téléphone comme bouton "Démarrer/Arrêter" et comme écran de prévisualisation des annotations.
 
 ---
 
